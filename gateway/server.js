@@ -53,6 +53,19 @@ app.get('/api/books', async (req, res) => {
     }
 });
 
+app.get('/api/books/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) {
+            return res.json([]);
+        }
+        const response = await promisifyGrpcCall(client.SearchBooks, { query: q });
+        res.json(response.books);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/books', async (req, res) => {
     try {
         const { title, author } = req.body;
@@ -158,6 +171,28 @@ app.post('/api/books/:bookId/return', async (req, res) => {
         } else {
             res.status(500).json({ error: error.message });
         }
+    }
+});
+
+app.get('/api/members', async (req, res) => {
+    try {
+        const response = await promisifyGrpcCall(client.ListMembers, {});
+        res.json(response.members);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/members/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) {
+            return res.json([]);
+        }
+        const response = await promisifyGrpcCall(client.SearchMembers, { query: q });
+        res.json(response.members);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
