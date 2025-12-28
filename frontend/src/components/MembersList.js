@@ -58,12 +58,13 @@ function MembersList() {
                 <th>ID</th>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {members.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="text-center">
+                  <td colSpan="4" className="text-center">
                     <div className="alert alert-info mb-0">No members found. Add some members to get started!</div>
                   </td>
                 </tr>
@@ -73,6 +74,11 @@ function MembersList() {
                     <td>{member.id}</td>
                     <td>{member.name}</td>
                     <td>{member.email}</td>
+                    <td>
+                      <Link to={`/members/${member.id}/borrowed-books`} className="btn btn-sm btn-outline-primary">
+                        View Borrowed Books
+                      </Link>
+                    </td>
                   </tr>
                 ))
               )}

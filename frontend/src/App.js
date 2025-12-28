@@ -6,6 +6,7 @@ import MembersList from './components/MembersList';
 import CreateBook from './components/CreateBook';
 import CreateMember from './components/CreateMember';
 import BorrowBook from './components/BorrowBook';
+import MemberBorrowedBooks from './components/MemberBorrowedBooks';
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/books" element={<BooksList />} />
             <Route path="/members" element={<MembersList />} />
+            <Route path="/members/:id/borrowed-books" element={<MemberBorrowedBooks />} />
             <Route path="/create-book" element={<CreateBook />} />
             <Route path="/create-member" element={<CreateMember />} />
             <Route path="/borrow-book" element={<BorrowBook />} />

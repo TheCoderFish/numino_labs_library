@@ -98,11 +98,11 @@ router.put('/:id', validateMemberId, validateMemberInput, async (req, res) => {
     }
 });
 
-router.get('/:memberId/borrowed-books', validateMemberId, async (req, res) => {
+router.get('/:id/borrowed-books', validateMemberId, async (req, res) => {
     try {
-        const { memberId } = req.params;
+        const { id } = req.params;
         const response = await promisifyGrpcCall(client.ListBorrowedBooks, {
-            member_id: parseInt(memberId)
+            member_id: parseInt(id)
         });
         res.json(response.books);
     } catch (error) {
