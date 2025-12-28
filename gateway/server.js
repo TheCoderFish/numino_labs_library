@@ -23,6 +23,8 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 const libraryProto = grpc.loadPackageDefinition(packageDefinition).library;
 
 // Create gRPC client
+// Note: For production, use TLS credentials instead of createInsecure()
+// e.g., grpc.credentials.createSsl(rootCerts, privateKey, certChain)
 const client = new libraryProto.LibraryService(
     'localhost:50051',
     grpc.credentials.createInsecure()
@@ -45,5 +47,7 @@ app.use('/api/books', ledgerRoutes); // Borrow/return routes are under /api/book
 
 app.listen(PORT, () => {
     console.log(`API Gateway running on http://localhost:${PORT}`);
+    // Note: For production, use HTTPS instead of HTTP
+    // e.g., const https = require('https'); https.createServer(options, app).listen(443);
 });
 

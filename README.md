@@ -45,10 +45,7 @@ numino/
 docker-compose up -d
 ```
 
-This will start PostgreSQL on port `5435` with:
-- Database: `numino_db`
-- User: `numino_user`
-- Password: `numino_password`
+This will start PostgreSQL on port `5435` with credentials defined in `.env`.
 
 ### 2. Initialize Database Schema
 
@@ -81,7 +78,7 @@ chmod +x generate_proto.sh
 # DB_PORT=5435
 # DB_NAME=numino_db
 # DB_USER=numino_user
-# DB_PASSWORD=numino_password
+# DB_PASSWORD=<your_password>
 
 # Start the gRPC server
 python server.py
