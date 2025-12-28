@@ -95,7 +95,38 @@ app.put('/api/books/:id', async (req, res) => {
     }
 });
 
-// Members
+app.patch('/api/books/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bookId = parseInt(id);
+        
+        // Get current book data
+        const listResponse = await promisifyGrpcCall(client.ListBooks, {});
+        const currentBook = listResponse.books.find(book => book.id === bookId);
+        
+        if (!currentBook) {
+            return res.status(404).json({ error: 'Book not found' });
+        }
+        
+        // Merge provided fields with current data
+        const updatedTitle = req.body.title !== undefined ? req.body.title : currentBook.title;
+        const updatedAuthor = req.body.author !== undefined ? req.body.author : currentBook.author;
+        
+        // Update the book
+        const response = await promisifyGrpcCall(client.UpdateBook, {
+            id: bookId,
+            title: updatedTitle,
+            author: updatedAuthor
+        });
+        res.json(response);
+    } catch (error) {
+        if (error.code === 5) { // NOT_FOUND
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
 app.post('/api/members', async (req, res) => {
     try {
         const { name, email } = req.body;
