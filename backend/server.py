@@ -6,8 +6,11 @@ from psycopg2.extras import RealDictCursor
 from psycopg2 import pool
 from datetime import datetime, date
 from dotenv import load_dotenv
-import library_pb2
+import book_pb2
+import member_pb2
+import ledger_pb2
 import library_pb2_grpc
+from google.protobuf.timestamp_pb2 import Timestamp
 
 load_dotenv()
 
@@ -42,25 +45,33 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "INSERT INTO book (title, author, is_borrowed) VALUES (%s, %s, FALSE) RETURNING id, title, author, is_borrowed, current_member_id",
+                    "INSERT INTO book (title, author, is_borrowed) VALUES (%s, %s, FALSE) RETURNING id, title, author, is_borrowed, current_member_id, created_at, updated_at",
                     (request.title, request.author)
                 )
                 result = cur.fetchone()
                 conn.commit()
                 
-                book = library_pb2.Book(
+                # Convert timestamps
+                created_at_ts = Timestamp()
+                created_at_ts.FromDatetime(result['created_at'])
+                updated_at_ts = Timestamp()
+                updated_at_ts.FromDatetime(result['updated_at'])
+                
+                book = book_pb2.Book(
                     id=result['id'],
                     title=result['title'],
                     author=result['author'],
                     is_borrowed=result['is_borrowed'],
-                    current_member_id=result['current_member_id'] or 0
+                    current_member_id=result['current_member_id'] or 0,
+                    created_at=created_at_ts,
+                    updated_at=updated_at_ts
                 )
-                return library_pb2.CreateBookResponse(book=book, message="Book created successfully")
+                return book_pb2.CreateBookResponse(book=book, message="Book created successfully")
         except Exception as e:
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.CreateBookResponse()
+            return book_pb2.CreateBookResponse()
         finally:
             return_db_connection(conn)
     
@@ -70,30 +81,38 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "UPDATE book SET title = %s, author = %s WHERE id = %s RETURNING id, title, author, is_borrowed, current_member_id",
+                    "UPDATE book SET title = %s, author = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING id, title, author, is_borrowed, current_member_id, created_at, updated_at",
                     (request.title, request.author, request.id)
                 )
                 result = cur.fetchone()
                 if not result:
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Book not found")
-                    return library_pb2.UpdateBookResponse()
+                    return book_pb2.UpdateBookResponse()
                 
                 conn.commit()
                 
-                book = library_pb2.Book(
+                # Convert timestamps
+                created_at_ts = Timestamp()
+                created_at_ts.FromDatetime(result['created_at'])
+                updated_at_ts = Timestamp()
+                updated_at_ts.FromDatetime(result['updated_at'])
+                
+                book = book_pb2.Book(
                     id=result['id'],
                     title=result['title'],
                     author=result['author'],
                     is_borrowed=result['is_borrowed'],
-                    current_member_id=result['current_member_id'] or 0
+                    current_member_id=result['current_member_id'] or 0,
+                    created_at=created_at_ts,
+                    updated_at=updated_at_ts
                 )
-                return library_pb2.UpdateBookResponse(book=book, message="Book updated successfully")
+                return book_pb2.UpdateBookResponse(book=book, message="Book updated successfully")
         except Exception as e:
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.UpdateBookResponse()
+            return book_pb2.UpdateBookResponse()
         finally:
             return_db_connection(conn)
     
@@ -103,7 +122,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id, 
+                    SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id, b.created_at, b.updated_at,
                            COALESCE(m.name, '') as current_member_name
                     FROM book b
                     LEFT JOIN member m ON b.current_member_id = m.id
@@ -113,20 +132,27 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 
                 books = []
                 for row in results:
-                    books.append(library_pb2.Book(
+                    created_at_ts = Timestamp()
+                    created_at_ts.FromDatetime(row['created_at'])
+                    updated_at_ts = Timestamp()
+                    updated_at_ts.FromDatetime(row['updated_at'])
+                    
+                    books.append(book_pb2.Book(
                         id=row['id'],
                         title=row['title'],
                         author=row['author'],
                         is_borrowed=row['is_borrowed'],
                         current_member_id=row['current_member_id'] or 0,
-                        current_member_name=row['current_member_name'] or ''
+                        current_member_name=row['current_member_name'] or '',
+                        created_at=created_at_ts,
+                        updated_at=updated_at_ts
                     ))
                 
-                return library_pb2.ListBooksResponse(books=books)
+                return book_pb2.ListBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.ListBooksResponse()
+            return book_pb2.ListBooksResponse()
         finally:
             return_db_connection(conn)
     
@@ -137,7 +163,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = f"%{request.query}%"
                 cur.execute("""
-                    SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id,
+                    SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id, b.created_at, b.updated_at,
                            COALESCE(m.name, '') as current_member_name
                     FROM book b
                     LEFT JOIN member m ON b.current_member_id = m.id
@@ -149,20 +175,27 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 
                 books = []
                 for row in results:
-                    books.append(library_pb2.Book(
+                    created_at_ts = Timestamp()
+                    created_at_ts.FromDatetime(row['created_at'])
+                    updated_at_ts = Timestamp()
+                    updated_at_ts.FromDatetime(row['updated_at'])
+                    
+                    books.append(book_pb2.Book(
                         id=row['id'],
                         title=row['title'],
                         author=row['author'],
                         is_borrowed=row['is_borrowed'],
                         current_member_id=row['current_member_id'] or 0,
-                        current_member_name=row['current_member_name'] or ''
+                        current_member_name=row['current_member_name'] or '',
+                        created_at=created_at_ts,
+                        updated_at=updated_at_ts
                     ))
                 
-                return library_pb2.SearchBooksResponse(books=books)
+                return book_pb2.SearchBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.SearchBooksResponse()
+            return book_pb2.SearchBooksResponse()
         finally:
             return_db_connection(conn)
     
@@ -172,28 +205,35 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "INSERT INTO member (name, email) VALUES (%s, %s) RETURNING id, name, email",
+                    "INSERT INTO member (name, email) VALUES (%s, %s) RETURNING id, name, email, created_at, updated_at",
                     (request.name, request.email)
                 )
                 result = cur.fetchone()
                 conn.commit()
                 
-                member = library_pb2.Member(
+                created_at_ts = Timestamp()
+                created_at_ts.FromDatetime(result['created_at'])
+                updated_at_ts = Timestamp()
+                updated_at_ts.FromDatetime(result['updated_at'])
+                
+                member = member_pb2.Member(
                     id=result['id'],
                     name=result['name'],
-                    email=result['email']
+                    email=result['email'],
+                    created_at=created_at_ts,
+                    updated_at=updated_at_ts
                 )
-                return library_pb2.CreateMemberResponse(member=member, message="Member created successfully")
+                return member_pb2.CreateMemberResponse(member=member, message="Member created successfully")
         except psycopg2.IntegrityError:
             conn.rollback()
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             context.set_details("Email already exists")
-            return library_pb2.CreateMemberResponse()
+            return member_pb2.CreateMemberResponse()
         except Exception as e:
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.CreateMemberResponse()
+            return member_pb2.CreateMemberResponse()
         finally:
             return_db_connection(conn)
     
@@ -202,22 +242,29 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         conn = get_db_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, name, email FROM member ORDER BY name")
+                cur.execute("SELECT id, name, email, created_at, updated_at FROM member ORDER BY name")
                 results = cur.fetchall()
                 
                 members = []
                 for row in results:
-                    members.append(library_pb2.Member(
+                    created_at_ts = Timestamp()
+                    created_at_ts.FromDatetime(row['created_at'])
+                    updated_at_ts = Timestamp()
+                    updated_at_ts.FromDatetime(row['updated_at'])
+                    
+                    members.append(member_pb2.Member(
                         id=row['id'],
                         name=row['name'],
-                        email=row['email']
+                        email=row['email'],
+                        created_at=created_at_ts,
+                        updated_at=updated_at_ts
                     ))
                 
-                return library_pb2.ListMembersResponse(members=members)
+                return member_pb2.ListMembersResponse(members=members)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.ListMembersResponse()
+            return member_pb2.ListMembersResponse()
         finally:
             return_db_connection(conn)
     
@@ -228,7 +275,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = f"%{request.query}%"
                 cur.execute("""
-                    SELECT id, name, email FROM member
+                    SELECT id, name, email, created_at, updated_at FROM member
                     WHERE name ILIKE %s OR email ILIKE %s
                     ORDER BY name
                     LIMIT 50
@@ -237,17 +284,24 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 
                 members = []
                 for row in results:
-                    members.append(library_pb2.Member(
+                    created_at_ts = Timestamp()
+                    created_at_ts.FromDatetime(row['created_at'])
+                    updated_at_ts = Timestamp()
+                    updated_at_ts.FromDatetime(row['updated_at'])
+                    
+                    members.append(member_pb2.Member(
                         id=row['id'],
                         name=row['name'],
-                        email=row['email']
+                        email=row['email'],
+                        created_at=created_at_ts,
+                        updated_at=updated_at_ts
                     ))
                 
-                return library_pb2.SearchMembersResponse(members=members)
+                return member_pb2.SearchMembersResponse(members=members)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.SearchMembersResponse()
+            return member_pb2.SearchMembersResponse()
         finally:
             return_db_connection(conn)
     
@@ -257,33 +311,40 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "UPDATE member SET name = %s, email = %s WHERE id = %s RETURNING id, name, email",
+                    "UPDATE member SET name = %s, email = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING id, name, email, created_at, updated_at",
                     (request.name, request.email, request.id)
                 )
                 result = cur.fetchone()
                 if not result:
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Member not found")
-                    return library_pb2.UpdateMemberResponse()
+                    return member_pb2.UpdateMemberResponse()
                 
                 conn.commit()
                 
-                member = library_pb2.Member(
+                created_at_ts = Timestamp()
+                created_at_ts.FromDatetime(result['created_at'])
+                updated_at_ts = Timestamp()
+                updated_at_ts.FromDatetime(result['updated_at'])
+                
+                member = member_pb2.Member(
                     id=result['id'],
                     name=result['name'],
-                    email=result['email']
+                    email=result['email'],
+                    created_at=created_at_ts,
+                    updated_at=updated_at_ts
                 )
-                return library_pb2.UpdateMemberResponse(member=member, message="Member updated successfully")
+                return member_pb2.UpdateMemberResponse(member=member, message="Member updated successfully")
         except psycopg2.IntegrityError:
             conn.rollback()
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             context.set_details("Email already exists")
-            return library_pb2.UpdateMemberResponse()
+            return member_pb2.UpdateMemberResponse()
         except Exception as e:
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.UpdateMemberResponse()
+            return member_pb2.UpdateMemberResponse()
         finally:
             return_db_connection(conn)
     
@@ -306,13 +367,13 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                     conn.rollback()
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Book not found")
-                    return library_pb2.BorrowBookResponse()
+                    return ledger_pb2.BorrowBookResponse()
                 
                 if book['is_borrowed']:
                     conn.rollback()
                     context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
                     context.set_details("Book is already borrowed")
-                    return library_pb2.BorrowBookResponse()
+                    return ledger_pb2.BorrowBookResponse()
                 
                 # Verify member exists
                 cur.execute("SELECT id FROM member WHERE id = %s", (request.member_id,))
@@ -321,7 +382,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                     conn.rollback()
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Member not found")
-                    return library_pb2.BorrowBookResponse()
+                    return ledger_pb2.BorrowBookResponse()
                 
                 # Update book status
                 cur.execute(
@@ -339,16 +400,27 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 
                 conn.commit()
                 
-                ledger = library_pb2.LedgerEntry(
+                # Convert dates to Timestamp
+                log_date_ts = Timestamp()
+                if ledger_entry['log_date']:
+                    log_date_ts.FromDatetime(ledger_entry['log_date'])
+                
+                due_date_ts = Timestamp()
+                if ledger_entry['due_date_snapshot']:
+                    due_date_ts.FromDatetime(datetime.combine(ledger_entry['due_date_snapshot'], datetime.min.time()))
+                
+                action_type_enum = ledger_pb2.ActionType.BORROW if ledger_entry['action_type'] == 'BORROW' else ledger_pb2.ActionType.RETURN
+                
+                ledger = ledger_pb2.LedgerEntry(
                     id=ledger_entry['id'],
                     book_id=ledger_entry['book_id'],
                     member_id=ledger_entry['member_id'],
-                    action_type=ledger_entry['action_type'],
-                    log_date=ledger_entry['log_date'].isoformat() if ledger_entry['log_date'] else '',
-                    due_date_snapshot=ledger_entry['due_date_snapshot'].isoformat() if ledger_entry['due_date_snapshot'] else ''
+                    action_type=action_type_enum,
+                    log_date=log_date_ts,
+                    due_date_snapshot=due_date_ts
                 )
                 
-                return library_pb2.BorrowBookResponse(
+                return ledger_pb2.BorrowBookResponse(
                     success=True,
                     message="Book borrowed successfully",
                     ledger_entry=ledger
@@ -357,7 +429,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.BorrowBookResponse()
+            return ledger_pb2.BorrowBookResponse()
         finally:
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
             return_db_connection(conn)
@@ -381,19 +453,19 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                     conn.rollback()
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Book not found")
-                    return library_pb2.ReturnBookResponse()
+                    return ledger_pb2.ReturnBookResponse()
                 
                 if not book['is_borrowed']:
                     conn.rollback()
                     context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
                     context.set_details("Book is not currently borrowed")
-                    return library_pb2.ReturnBookResponse()
+                    return ledger_pb2.ReturnBookResponse()
                 
                 if book['current_member_id'] != request.member_id:
                     conn.rollback()
                     context.set_code(grpc.StatusCode.PERMISSION_DENIED)
                     context.set_details("This member did not borrow this book")
-                    return library_pb2.ReturnBookResponse()
+                    return ledger_pb2.ReturnBookResponse()
                 
                 # Update book status
                 cur.execute(
@@ -410,16 +482,25 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 
                 conn.commit()
                 
-                ledger = library_pb2.LedgerEntry(
+                # Convert dates to Timestamp
+                log_date_ts = Timestamp()
+                if ledger_entry['log_date']:
+                    log_date_ts.FromDatetime(ledger_entry['log_date'])
+                
+                due_date_ts = Timestamp()  # Empty for return
+                
+                action_type_enum = ledger_pb2.ActionType.RETURN
+                
+                ledger = ledger_pb2.LedgerEntry(
                     id=ledger_entry['id'],
                     book_id=ledger_entry['book_id'],
                     member_id=ledger_entry['member_id'],
-                    action_type=ledger_entry['action_type'],
-                    log_date=ledger_entry['log_date'].isoformat() if ledger_entry['log_date'] else '',
-                    due_date_snapshot=''
+                    action_type=action_type_enum,
+                    log_date=log_date_ts,
+                    due_date_snapshot=due_date_ts
                 )
                 
-                return library_pb2.ReturnBookResponse(
+                return ledger_pb2.ReturnBookResponse(
                     success=True,
                     message="Book returned successfully",
                     ledger_entry=ledger
@@ -428,7 +509,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             conn.rollback()
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.ReturnBookResponse()
+            return ledger_pb2.ReturnBookResponse()
         finally:
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
             return_db_connection(conn)
@@ -439,26 +520,33 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT id, title, author, is_borrowed, current_member_id FROM book WHERE current_member_id = %s AND is_borrowed = TRUE ORDER BY id",
+                    "SELECT id, title, author, is_borrowed, current_member_id, created_at, updated_at FROM book WHERE current_member_id = %s AND is_borrowed = TRUE ORDER BY id",
                     (request.member_id,)
                 )
                 results = cur.fetchall()
                 
                 books = []
                 for row in results:
-                    books.append(library_pb2.Book(
+                    created_at_ts = Timestamp()
+                    created_at_ts.FromDatetime(row['created_at'])
+                    updated_at_ts = Timestamp()
+                    updated_at_ts.FromDatetime(row['updated_at'])
+                    
+                    books.append(book_pb2.Book(
                         id=row['id'],
                         title=row['title'],
                         author=row['author'],
                         is_borrowed=row['is_borrowed'],
-                        current_member_id=row['current_member_id'] or 0
+                        current_member_id=row['current_member_id'] or 0,
+                        created_at=created_at_ts,
+                        updated_at=updated_at_ts
                     ))
                 
-                return library_pb2.ListBorrowedBooksResponse(books=books)
+                return ledger_pb2.ListBorrowedBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
-            return library_pb2.ListBorrowedBooksResponse()
+            return ledger_pb2.ListBorrowedBooksResponse()
         finally:
             return_db_connection(conn)
 

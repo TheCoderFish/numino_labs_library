@@ -1,0 +1,55 @@
+edition = "2023";
+
+package library;
+
+import "google/protobuf/timestamp.proto";
+import "book.proto";
+
+// Ledger entry message
+message LedgerEntry {
+    int32 id = 1;
+    int32 book_id = 2;
+    int32 member_id = 3;
+    ActionType action_type = 4;
+    google.protobuf.Timestamp log_date = 5;
+    google.protobuf.Timestamp due_date_snapshot = 6;
+}
+
+enum ActionType {
+    ACTION_TYPE_UNSPECIFIED = 0;
+    BORROW = 1;
+    RETURN = 2;
+}
+
+// Borrow Book Request/Response
+message BorrowBookRequest {
+    int32 book_id = 1;
+    int32 member_id = 2;
+}
+
+message BorrowBookResponse {
+    bool success = 1;
+    string message = 2;
+    LedgerEntry ledger_entry = 3;
+}
+
+// Return Book Request/Response
+message ReturnBookRequest {
+    int32 book_id = 1;
+    int32 member_id = 2;
+}
+
+message ReturnBookResponse {
+    bool success = 1;
+    string message = 2;
+    LedgerEntry ledger_entry = 3;
+}
+
+// List Borrowed Books Request/Response
+message ListBorrowedBooksRequest {
+    int32 member_id = 1;
+}
+
+message ListBorrowedBooksResponse {
+    repeated Book books = 1;
+}

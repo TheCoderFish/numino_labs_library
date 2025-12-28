@@ -4,7 +4,9 @@
 CREATE TABLE member (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE
+    email TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 2. Books: Tracking state for O(1) lookups
@@ -13,7 +15,9 @@ CREATE TABLE book (
     title TEXT NOT NULL,
     author TEXT NOT NULL,
     is_borrowed BOOLEAN DEFAULT FALSE,
-    current_member_id INTEGER REFERENCES member(id)
+    current_member_id INTEGER REFERENCES member(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. Transaction Ledger: Tracking history and return deltas

@@ -1,0 +1,54 @@
+edition = "2023";
+
+package library;
+
+import "google/protobuf/timestamp.proto";
+
+// Member message
+message Member {
+    int32 id = 1;
+    string name = 2;
+    string email = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+}
+
+// Create Member Request/Response
+message CreateMemberRequest {
+    string name = 1;
+    string email = 2;
+}
+
+message CreateMemberResponse {
+    Member member = 1;
+    string message = 2;
+}
+
+// Update Member Request/Response
+message UpdateMemberRequest {
+    int32 id = 1;
+    string name = 2;
+    string email = 3;
+}
+
+message UpdateMemberResponse {
+    Member member = 1;
+    string message = 2;
+}
+
+// List Members Request/Response
+message ListMembersRequest {
+}
+
+message ListMembersResponse {
+    repeated Member members = 1;
+}
+
+// Search Members Request/Response
+message SearchMembersRequest {
+    string query = 1; // Search by name or email
+}
+
+message SearchMembersResponse {
+    repeated Member members = 1;
+}

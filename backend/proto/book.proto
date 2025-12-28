@@ -1,0 +1,57 @@
+edition = "2023";
+
+package library;
+
+import "google/protobuf/timestamp.proto";
+
+// Book message
+message Book {
+    int32 id = 1;
+    string title = 2;
+    string author = 3;
+    bool is_borrowed = 4;
+    int32 current_member_id = 5;
+    string current_member_name = 6; // Member name if borrowed
+    google.protobuf.Timestamp created_at = 7;
+    google.protobuf.Timestamp updated_at = 8;
+}
+
+// Create Book Request/Response
+message CreateBookRequest {
+    string title = 1;
+    string author = 2;
+}
+
+message CreateBookResponse {
+    Book book = 1;
+    string message = 2;
+}
+
+// Update Book Request/Response
+message UpdateBookRequest {
+    int32 id = 1;
+    string title = 2;
+    string author = 3;
+}
+
+message UpdateBookResponse {
+    Book book = 1;
+    string message = 2;
+}
+
+// List Books Request/Response
+message ListBooksRequest {
+}
+
+message ListBooksResponse {
+    repeated Book books = 1;
+}
+
+// Search Books Request/Response
+message SearchBooksRequest {
+    string query = 1; // Search by title or author
+}
+
+message SearchBooksResponse {
+    repeated Book books = 1;
+}
