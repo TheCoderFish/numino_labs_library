@@ -14,6 +14,8 @@ import member_pb2
 from db_helper import DatabaseHelper, Book, Member
 from error_codes import ErrorCodes
 from messages import Messages
+from logger import logger
+from config import Config
 
 load_dotenv()
 
@@ -22,44 +24,54 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
 
     def CreateBook(self, request, context):
         """Create a new book"""
+        logger.info(f"CreateBook operation started for title: {request.title}, author: {request.author}")
         try:
             Book.validate_data(request.title, request.author)
             result = DatabaseHelper.create_book(request.title, request.author)
             book = book_pb2.Book()
             ParseDict(result, book, ignore_unknown_fields=True)
+            logger.info(f"CreateBook operation successful for book ID: {book.id}")
             return book_pb2.CreateBookResponse(book=book, message=Messages.BOOK_CREATED)
         except ValueError as e:
+            logger.warning(f"CreateBook validation error: {str(e)}")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return book_pb2.CreateBookResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} CreateBook operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return book_pb2.CreateBookResponse()
 
     def UpdateBook(self, request, context):
         """Update an existing book"""
+        logger.info(f"UpdateBook operation started for book ID: {request.id}, title: {request.title}, author: {request.author}")
         try:
             Book.validate_data(request.title, request.author)
             result = DatabaseHelper.update_book(request.id, request.title, request.author)
             if not result:
+                logger.warning(f"UpdateBook: Book not found for ID: {request.id}")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details(json.dumps({"code": ErrorCodes.BOOK_NOT_FOUND, "message": "Book not found"}))
                 return book_pb2.UpdateBookResponse()
             book = book_pb2.Book()
             ParseDict(result, book, ignore_unknown_fields=True)
+            logger.info(f"UpdateBook operation successful for book ID: {book.id}")
             return book_pb2.UpdateBookResponse(book=book, message=Messages.BOOK_UPDATED)
         except ValueError as e:
+            logger.warning(f"UpdateBook validation error: {str(e)}")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return book_pb2.UpdateBookResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} UpdateBook operation failed for ID {request.id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return book_pb2.UpdateBookResponse()
 
     def ListBooks(self, request, context):
         """List all books with member name"""
+        logger.info("ListBooks operation started")
         try:
             results = DatabaseHelper.list_books()
             books = []
@@ -67,14 +79,17 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 book = book_pb2.Book()
                 ParseDict(row, book, ignore_unknown_fields=True)
                 books.append(book)
+            logger.info(f"ListBooks operation successful, returned {len(books)} books")
             return book_pb2.ListBooksResponse(books=books)
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} ListBooks operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return book_pb2.ListBooksResponse()
 
     def SearchBooks(self, request, context):
         """Search books by title or author"""
+        logger.info(f"SearchBooks operation started with query: {request.query}")
         try:
             results = DatabaseHelper.search_books(request.query)
             books = []
@@ -82,35 +97,43 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 book = book_pb2.Book()
                 ParseDict(row, book, ignore_unknown_fields=True)
                 books.append(book)
+            logger.info(f"SearchBooks operation successful, found {len(books)} books")
             return book_pb2.SearchBooksResponse(books=books)
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} SearchBooks operation failed for query '{request.query}': {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return book_pb2.SearchBooksResponse()
 
     def CreateMember(self, request, context):
         """Create a new member"""
+        logger.info(f"CreateMember operation started for name: {request.name}, email: {request.email}")
         try:
             Member.validate_data(request.name, request.email)
             result = DatabaseHelper.create_member(request.name, request.email)
             member = member_pb2.Member()
             ParseDict(result, member, ignore_unknown_fields=True)
+            logger.info(f"CreateMember operation successful for member ID: {member.id}")
             return member_pb2.CreateMemberResponse(member=member, message=Messages.MEMBER_CREATED)
         except ValueError as e:
             if "Email already exists" in str(e):
+                logger.warning(f"CreateMember: Email already exists for {request.email}")
                 context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                 context.set_details(json.dumps({"code": ErrorCodes.EMAIL_ALREADY_EXISTS, "message": str(e)}))
             else:
+                logger.warning(f"CreateMember validation error: {str(e)}")
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                 context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return member_pb2.CreateMemberResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} CreateMember operation failed for {request.name}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return member_pb2.CreateMemberResponse()
 
     def ListMembers(self, request, context):
         """List all members"""
+        logger.info("ListMembers operation started")
         try:
             results = DatabaseHelper.list_members()
             members = []
@@ -118,14 +141,17 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 member = member_pb2.Member()
                 ParseDict(row, member, ignore_unknown_fields=True)
                 members.append(member)
+            logger.info(f"ListMembers operation successful, returned {len(members)} members")
             return member_pb2.ListMembersResponse(members=members)
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} ListMembers operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return member_pb2.ListMembersResponse()
 
     def SearchMembers(self, request, context):
         """Search members by name or email"""
+        logger.info(f"SearchMembers operation started with query: {request.query}")
         try:
             results = DatabaseHelper.search_members(request.query)
             members = []
@@ -133,47 +159,58 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 member = member_pb2.Member()
                 ParseDict(row, member, ignore_unknown_fields=True)
                 members.append(member)
+            logger.info(f"SearchMembers operation successful, found {len(members)} members")
             return member_pb2.SearchMembersResponse(members=members)
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} SearchMembers operation failed for query '{request.query}': {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return member_pb2.SearchMembersResponse()
 
     def UpdateMember(self, request, context):
         """Update an existing member"""
+        logger.info(f"UpdateMember operation started for member ID: {request.id}, name: {request.name}, email: {request.email}")
         try:
             Member.validate_data(request.name, request.email)
             result = DatabaseHelper.update_member(request.id, request.name, request.email)
             if not result:
+                logger.warning(f"UpdateMember: Member not found for ID: {request.id}")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details(json.dumps({"code": ErrorCodes.MEMBER_NOT_FOUND, "message": "Member not found"}))
                 return member_pb2.UpdateMemberResponse()
             member = member_pb2.Member()
             ParseDict(result, member, ignore_unknown_fields=True)
+            logger.info(f"UpdateMember operation successful for member ID: {member.id}")
             return member_pb2.UpdateMemberResponse(member=member, message=Messages.MEMBER_UPDATED)
         except ValueError as e:
             if "Email already exists" in str(e):
+                logger.warning(f"UpdateMember: Email already exists for {request.email}")
                 context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                 context.set_details(json.dumps({"code": ErrorCodes.EMAIL_ALREADY_EXISTS, "message": str(e)}))
             else:
+                logger.warning(f"UpdateMember validation error: {str(e)}")
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                 context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return member_pb2.UpdateMemberResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} UpdateMember operation failed for ID {request.id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return member_pb2.UpdateMemberResponse()
 
     def BorrowBook(self, request, context):
         """Borrow a book"""
+        logger.info(f"BorrowBook operation started for book ID: {request.book_id}, member ID: {request.member_id}")
         try:
             # Business logic validations
             if not DatabaseHelper.is_book_available(request.book_id):
+                logger.warning(f"BorrowBook: Book {request.book_id} is not available")
                 context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
                 context.set_details(
                     json.dumps({"code": ErrorCodes.BOOK_ALREADY_BORROWED, "message": "Book is not available"}))
                 return ledger_pb2.BorrowBookResponse()
             if not DatabaseHelper.member_exists(request.member_id):
+                logger.warning(f"BorrowBook: Member {request.member_id} not found")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details(json.dumps({"code": ErrorCodes.MEMBER_NOT_FOUND, "message": "Member not found"}))
                 return ledger_pb2.BorrowBookResponse()
@@ -198,25 +235,30 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             due_date_ts.FromDatetime(due_date)
             ledger_entry.due_date_snapshot.CopyFrom(due_date_ts)
 
+            logger.info(f"BorrowBook operation successful, ledger entry ID: {ledger_entry.id}")
             return ledger_pb2.BorrowBookResponse(
                 success=True,
                 ledger_entry=ledger_entry,
                 message=Messages.BOOK_BORROWED
             )
         except ValueError as e:
+            logger.warning(f"BorrowBook validation error: {str(e)}")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return ledger_pb2.BorrowBookResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} BorrowBook operation failed for book {request.book_id}, member {request.member_id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return ledger_pb2.BorrowBookResponse()
 
     def ReturnBook(self, request, context):
         """Return a book"""
+        logger.info(f"ReturnBook operation started for book ID: {request.book_id}, member ID: {request.member_id}")
         try:
             # Business logic validations
             if not DatabaseHelper.is_book_borrowed_by_member(request.book_id, request.member_id):
+                logger.warning(f"ReturnBook: Book {request.book_id} is not borrowed by member {request.member_id}")
                 context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
                 context.set_details(json.dumps(
                     {"code": ErrorCodes.BOOK_NOT_BORROWED_BY_MEMBER, "message": "Book is not borrowed by this member"}))
@@ -243,22 +285,26 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 due_date_ts.FromDatetime(due_date)
                 ledger_entry.due_date_snapshot.CopyFrom(due_date_ts)
 
+            logger.info(f"ReturnBook operation successful, ledger entry ID: {ledger_entry.id}")
             return ledger_pb2.ReturnBookResponse(
                 success=True,
                 ledger_entry=ledger_entry,
                 message=Messages.BOOK_RETURNED
             )
         except ValueError as e:
+            logger.warning(f"ReturnBook validation error: {str(e)}")
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
             return ledger_pb2.ReturnBookResponse()
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} ReturnBook operation failed for book {request.book_id}, member {request.member_id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(json.dumps({"code": "INTERNAL_ERROR", "message": "An internal error occurred"}))
             return ledger_pb2.ReturnBookResponse()
 
     def ListBorrowedBooks(self, request, context):
         """List all books borrowed by a member"""
+        logger.info(f"ListBorrowedBooks operation started for member ID: {request.member_id}")
         try:
             results = DatabaseHelper.list_borrowed_books(request.member_id)
             books = []
@@ -266,8 +312,10 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 book = book_pb2.Book()
                 ParseDict(row, book, ignore_unknown_fields=True)
                 books.append(book)
+            logger.info(f"ListBorrowedBooks operation successful, returned {len(books)} books for member {request.member_id}")
             return ledger_pb2.ListBorrowedBooksResponse(books=books)
         except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} ListBorrowedBooks operation failed for member {request.member_id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ledger_pb2.ListBorrowedBooksResponse()
@@ -282,14 +330,15 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     library_pb2_grpc.add_LibraryServiceServicer_to_server(LibraryService(), server)
 
-    port = '50051'
+    port = Config.SERVER_PORT
     server.add_insecure_port('[::]:' + port)
     server.start()
-    print(f"Server started, listening on port {port}")
+    logger.info(f"Library gRPC server started, listening on port {port}")
 
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
+        logger.info("Server stopped by user")
         server.stop(0)
 
 

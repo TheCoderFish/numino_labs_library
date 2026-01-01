@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { handleGrpcError, handleValidationError } = require('../utils/errorHandler');
+const logger = require('../logger');
+const config = require('../config');
 
 // Middleware for validation
 const validateBookId = (req, res, next) => {
@@ -67,9 +69,10 @@ function convertLedgerEntry(entry) {
 
 // Routes
 router.post('/:bookId/borrow', validateBookId, validateBorrowInput, async (req, res) => {
+    const { bookId } = req.params;
+    const { member_id } = req.body;
+    logger.info(`POST /api/books/${bookId}/borrow - BorrowBook operation started for book ID: ${bookId}, member ID: ${member_id}`);
     try {
-        const { bookId } = req.params;
-        const { member_id } = req.body;
         const response = await promisifyGrpcCall(client.BorrowBook, {
             book_id: parseInt(bookId),
             member_id: parseInt(member_id)
@@ -79,16 +82,19 @@ router.post('/:bookId/borrow', validateBookId, validateBorrowInput, async (req, 
             message: response.message,
             ledger_entry: convertLedgerEntry(response.ledger_entry)
         };
+        logger.info(`POST /api/books/${bookId}/borrow - BorrowBook operation successful, ledger entry ID: ${response.ledger_entry.id}`);
         res.json(plainResponse);
     } catch (error) {
+        logger.error(`${config.ERROR_KEYWORD} POST /api/books/${bookId}/borrow - BorrowBook operation failed for book ${bookId}, member ${member_id}: ${error.message}`);
         handleGrpcError(error, res);
     }
 });
 
 router.post('/:bookId/return', validateBookId, validateReturnInput, async (req, res) => {
+    const { bookId } = req.params;
+    const { member_id } = req.body;
+    logger.info(`POST /api/books/${bookId}/return - ReturnBook operation started for book ID: ${bookId}, member ID: ${member_id}`);
     try {
-        const { bookId } = req.params;
-        const { member_id } = req.body;
         const response = await promisifyGrpcCall(client.ReturnBook, {
             book_id: parseInt(bookId),
             member_id: parseInt(member_id)
@@ -98,8 +104,10 @@ router.post('/:bookId/return', validateBookId, validateReturnInput, async (req, 
             message: response.message,
             ledger_entry: convertLedgerEntry(response.ledger_entry)
         };
+        logger.info(`POST /api/books/${bookId}/return - ReturnBook operation successful, ledger entry ID: ${response.ledger_entry.id}`);
         res.json(plainResponse);
     } catch (error) {
+        logger.error(`${config.ERROR_KEYWORD} POST /api/books/${bookId}/return - ReturnBook operation failed for book ${bookId}, member ${member_id}: ${error.message}`);
         handleGrpcError(error, res);
     }
 });

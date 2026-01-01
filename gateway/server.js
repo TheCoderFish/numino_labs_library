@@ -3,8 +3,11 @@ const cors = require('cors');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 
+const config = require('./config');
+const logger = require('./logger');
+
 const app = express();
-const PORT = 3001;
+const PORT = config.PORT;
 
 // Middleware
 app.use(cors());
@@ -26,7 +29,7 @@ const libraryProto = grpc.loadPackageDefinition(packageDefinition).library;
 // Note: For production, use TLS credentials instead of createInsecure()
 // e.g., grpc.credentials.createSsl(rootCerts, privateKey, certChain)
 const client = new libraryProto.LibraryService(
-    'localhost:50051',
+    `${config.BACKEND_HOST}:${config.BACKEND_PORT}`,
     grpc.credentials.createInsecure()
 );
 
@@ -46,7 +49,7 @@ app.use('/api/members', memberRoutes);
 app.use('/api/books', ledgerRoutes); // Borrow/return routes are under /api/books/:bookId
 
 app.listen(PORT, () => {
-    console.log(`API Gateway running on http://localhost:${PORT}`);
+    logger.info(`API Gateway running on http://localhost:${PORT}`);
     // Note: For production, use HTTPS instead of HTTP
     // e.g., const https = require('https'); https.createServer(options, app).listen(443);
 });
