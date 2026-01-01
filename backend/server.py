@@ -272,9 +272,29 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 message=Messages.BOOK_BORROWED
             )
         except ValueError as e:
-            logger.warning(f"BorrowBook validation error: {str(e)}")
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
+            error_msg = str(e)
+            # Handle specific business logic errors
+            if "already borrowed" in error_msg.lower() or "not available" in error_msg.lower():
+                logger.warning(f"BorrowBook: Book {request.book_id} is not available")
+                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                context.set_details(json.dumps({"code": ErrorCodes.BOOK_ALREADY_BORROWED, "message": error_msg}))
+            elif "not found" in error_msg.lower():
+                if "book" in error_msg.lower():
+                    logger.warning(f"BorrowBook: Book {request.book_id} not found")
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(json.dumps({"code": ErrorCodes.BOOK_NOT_FOUND, "message": error_msg}))
+                elif "member" in error_msg.lower():
+                    logger.warning(f"BorrowBook: Member {request.member_id} not found")
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(json.dumps({"code": ErrorCodes.MEMBER_NOT_FOUND, "message": error_msg}))
+                else:
+                    logger.warning(f"BorrowBook validation error: {error_msg}")
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": error_msg}))
+            else:
+                logger.warning(f"BorrowBook validation error: {error_msg}")
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": error_msg}))
             return ledger_pb2.BorrowBookResponse()
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} BorrowBook operation failed for book {request.book_id}, member {request.member_id}: {str(e)}")
@@ -322,9 +342,29 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
                 message=Messages.BOOK_RETURNED
             )
         except ValueError as e:
-            logger.warning(f"ReturnBook validation error: {str(e)}")
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": str(e)}))
+            error_msg = str(e)
+            # Handle specific business logic errors
+            if "not currently borrowed" in error_msg.lower() or "not borrowed" in error_msg.lower():
+                logger.warning(f"ReturnBook: Book {request.book_id} is not currently borrowed")
+                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                context.set_details(json.dumps({"code": ErrorCodes.BOOK_NOT_BORROWED, "message": error_msg}))
+            elif "did not borrow" in error_msg.lower() or "not borrowed by" in error_msg.lower():
+                logger.warning(f"ReturnBook: Book {request.book_id} is not borrowed by member {request.member_id}")
+                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                context.set_details(json.dumps({"code": ErrorCodes.BOOK_NOT_BORROWED_BY_MEMBER, "message": error_msg}))
+            elif "not found" in error_msg.lower():
+                if "book" in error_msg.lower():
+                    logger.warning(f"ReturnBook: Book {request.book_id} not found")
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(json.dumps({"code": ErrorCodes.BOOK_NOT_FOUND, "message": error_msg}))
+                else:
+                    logger.warning(f"ReturnBook validation error: {error_msg}")
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": error_msg}))
+            else:
+                logger.warning(f"ReturnBook validation error: {error_msg}")
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(json.dumps({"code": ErrorCodes.INVALID_INPUT, "message": error_msg}))
             return ledger_pb2.ReturnBookResponse()
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} ReturnBook operation failed for book {request.book_id}, member {request.member_id}: {str(e)}")

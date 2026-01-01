@@ -5,6 +5,8 @@ import book_pb2
 import member_pb2
 import ledger_pb2
 import grpc
+import threading
+import time
 
 class MockContext:
     def __init__(self):
@@ -217,7 +219,7 @@ class TestLedger:
         return_context = MockContext()
         return_response = service.ReturnBook(return_request, return_context)
 
-        assert return_context.code == grpc.StatusCode.PERMISSION_DENIED
+        assert return_context.code == grpc.StatusCode.FAILED_PRECONDITION
 
     def test_double_return(self, clean_database, db_connection):
         """Test returning the same book twice"""
@@ -291,3 +293,121 @@ class TestLedger:
         titles = [book.title for book in list_response.books]
         assert "Book 1" in titles
         assert "Book 2" in titles
+
+    def test_concurrent_borrow_same_book_different_members(self, clean_database):
+        """Test concurrent borrows of the same book by different members - only one should succeed"""
+        service = LibraryService()
+
+        # Create a book
+        book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
+        book_context = MockContext()
+        book_response = service.CreateBook(book_request, book_context)
+        book_id = book_response.book.id
+
+        # Create two members
+        member1_request = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
+        member1_context = MockContext()
+        member1_response = service.CreateMember(member1_request, member1_context)
+        member1_id = member1_response.member.id
+
+        member2_request = member_pb2.CreateMemberRequest(name="Jane Doe", email="jane@example.com")
+        member2_context = MockContext()
+        member2_response = service.CreateMember(member2_request, member2_context)
+        member2_id = member2_response.member.id
+
+        # Results storage for concurrent operations
+        results = []
+        errors = []
+
+        def borrow_book_thread(member_id, thread_id):
+            """Thread function to borrow book"""
+            try:
+                borrow_request = ledger_pb2.BorrowBookRequest(book_id=book_id, member_id=member_id)
+                borrow_context = MockContext()
+                borrow_response = service.BorrowBook(borrow_request, borrow_context)
+                results.append({
+                    'thread_id': thread_id,
+                    'member_id': member_id,
+                    'success': borrow_response.success,
+                    'error_code': borrow_context.code
+                })
+            except Exception as e:
+                errors.append({'thread_id': thread_id, 'error': str(e)})
+
+        # Start two threads trying to borrow the same book simultaneously
+        thread1 = threading.Thread(target=borrow_book_thread, args=(member1_id, 1))
+        thread2 = threading.Thread(target=borrow_book_thread, args=(member2_id, 2))
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        # Verify only one borrow succeeded
+        successful_borrows = [r for r in results if r['success']]
+        failed_borrows = [r for r in results if not r['success'] and r['error_code'] == grpc.StatusCode.FAILED_PRECONDITION]
+
+        assert len(successful_borrows) == 1, "Only one borrow should succeed"
+        assert len(failed_borrows) == 1, "One borrow should fail with FAILED_PRECONDITION"
+        assert len(results) == 2, "Both threads should complete"
+
+    def test_concurrent_return_same_book(self, clean_database):
+        """Test concurrent returns of the same book - only one should succeed"""
+        service = LibraryService()
+
+        # Create a book
+        book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
+        book_context = MockContext()
+        book_response = service.CreateBook(book_request, book_context)
+        book_id = book_response.book.id
+
+        # Create a member
+        member_request = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
+        member_context = MockContext()
+        member_response = service.CreateMember(member_request, member_context)
+        member_id = member_response.member.id
+
+        # Borrow the book first
+        borrow_request = ledger_pb2.BorrowBookRequest(book_id=book_id, member_id=member_id)
+        borrow_context = MockContext()
+        service.BorrowBook(borrow_request, borrow_context)
+
+        # Results storage for concurrent operations
+        results = []
+
+        def return_book_thread(thread_id):
+            """Thread function to return book"""
+            try:
+                return_request = ledger_pb2.ReturnBookRequest(book_id=book_id, member_id=member_id)
+                return_context = MockContext()
+                return_response = service.ReturnBook(return_request, return_context)
+                results.append({
+                    'thread_id': thread_id,
+                    'success': return_response.success,
+                    'error_code': return_context.code
+                })
+            except Exception as e:
+                results.append({
+                    'thread_id': thread_id,
+                    'success': False,
+                    'error': str(e)
+                })
+
+        # Start two threads trying to return the same book simultaneously
+        thread1 = threading.Thread(target=return_book_thread, args=(1,))
+        thread2 = threading.Thread(target=return_book_thread, args=(2,))
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        # Verify only one return succeeded
+        successful_returns = [r for r in results if r.get('success', False)]
+        failed_returns = [r for r in results if not r.get('success', False) and r.get('error_code') == grpc.StatusCode.FAILED_PRECONDITION]
+
+        assert len(successful_returns) == 1, "Only one return should succeed"
+        assert len(failed_returns) == 1, "One return should fail with FAILED_PRECONDITION"
+        assert len(results) == 2, "Both threads should complete"

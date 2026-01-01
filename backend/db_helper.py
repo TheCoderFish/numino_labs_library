@@ -391,8 +391,8 @@ class DatabaseHelper:
     def borrow_book(book_id, member_id):
         db = SessionLocal()
         try:
-            # Get the book
-            book = db.query(Book).filter(Book.id == book_id).first()
+            # Get the book with row-level lock to prevent concurrent modifications
+            book = db.query(Book).filter(Book.id == book_id).with_for_update().first()
             if not book:
                 raise ValueError("Book not found")
             if book.is_borrowed:
@@ -431,8 +431,8 @@ class DatabaseHelper:
     def return_book(book_id, member_id):
         db = SessionLocal()
         try:
-            # Get the book
-            book = db.query(Book).filter(Book.id == book_id).first()
+            # Get the book with row-level lock to prevent concurrent modifications
+            book = db.query(Book).filter(Book.id == book_id).with_for_update().first()
             if not book:
                 raise ValueError("Book not found")
             if not book.is_borrowed:
