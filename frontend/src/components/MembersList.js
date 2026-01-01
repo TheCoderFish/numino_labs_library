@@ -7,50 +7,78 @@ function MembersList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [nextCursor, setNextCursor] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentCursor, setCurrentCursor] = useState('');
+  const [cursorHistory, setCursorHistory] = useState([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
 
   useEffect(() => {
     loadMembers(true);
   }, [searchQuery]);
 
-  const loadMembers = async (reset = false) => {
+  const loadMembers = async (resetPagination = false, direction = null) => {
     try {
-      if (reset) {
-        setLoading(true);
-        setMembers([]);
-        setNextCursor(null);
-      } else {
-        setLoadingMore(true);
-      }
+      setLoading(true);
+
+      let cursorToUse = '';
+      let updatedHistory = cursorHistory;
       
+      if (direction === 'next' && currentCursor) {
+        cursorToUse = currentCursor;
+      } else if (direction === 'prev' && cursorHistory.length > 0) {
+        // For previous, we need to go back to the previous cursor
+        updatedHistory = [...cursorHistory];
+        cursorToUse = updatedHistory.pop() || '';
+        setCursorHistory(updatedHistory);
+      } else if (resetPagination) {
+        setCurrentCursor('');
+        updatedHistory = [];
+        setCursorHistory([]);
+      }
+
       const params = {
         limit: 20,
         search: searchQuery
       };
-      
-      if (!reset && nextCursor) {
-        params.cursor = nextCursor;
+
+      if (cursorToUse) {
+        params.cursor = cursorToUse;
       }
-      
+
       const response = await memberService.listMembers(params);
-      const newMembers = reset ? response.data.members : [...members, ...response.data.members];
-      
-      setMembers(newMembers);
-      setNextCursor(response.data.next_cursor || null);
-      setHasMore(response.data.has_more);
+
+      if (direction === 'next') {
+        // Save current cursor to history for potential previous navigation
+        updatedHistory = [...cursorHistory, currentCursor];
+        setCursorHistory(updatedHistory);
+      }
+
+      setMembers(response.data.members);
+      setCurrentCursor(response.data.next_cursor || '');
+      setHasNextPage(response.data.has_more);
+      setHasPreviousPage(updatedHistory.length > 0);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load members');
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      loadMembers(false, 'next');
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (hasPreviousPage) {
+      loadMembers(false, 'prev');
+    }
   };
 
   return (
@@ -126,23 +154,32 @@ function MembersList() {
               )}
             </tbody>
           </table>
-          
-          {hasMore && (
-            <div className="text-center mt-3">
-              <button
-                className="btn btn-outline-primary"
-                onClick={() => loadMembers(false)}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Loading...
-                  </>
-                ) : (
-                  'Load More'
-                )}
-              </button>
+
+          {/* Pagination Controls */}
+          {(hasPreviousPage || hasNextPage) && (
+            <div className="d-flex justify-content-center mt-3">
+              <nav aria-label="Members pagination">
+                <ul className="pagination">
+                  <li className={`page-item ${!hasPreviousPage ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={handlePreviousPage}
+                      disabled={!hasPreviousPage}
+                    >
+                      Previous
+                    </button>
+                  </li>
+                  <li className={`page-item ${!hasNextPage ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={handleNextPage}
+                      disabled={!hasNextPage}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             </div>
           )}
         </div>

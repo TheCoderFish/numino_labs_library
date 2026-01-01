@@ -9,46 +9,58 @@ function BooksList() {
   const [returning, setReturning] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [nextCursor, setNextCursor] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentCursor, setCurrentCursor] = useState('');
+  const [cursorHistory, setCursorHistory] = useState([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
 
   useEffect(() => {
     loadBooks(true);
   }, [searchQuery, filter]);
 
-  const loadBooks = async (reset = false) => {
+  const loadBooks = async (resetPagination = false, direction = null) => {
     try {
-      if (reset) {
-        setLoading(true);
-        setBooks([]);
-        setNextCursor(null);
-      } else {
-        setLoadingMore(true);
+      setLoading(true);
+
+      let cursorToUse = '';
+      if (direction === 'next' && currentCursor) {
+        cursorToUse = currentCursor;
+      } else if (direction === 'prev' && cursorHistory.length > 0) {
+        // For previous, we need to go back to the previous cursor
+        const newHistory = [...cursorHistory];
+        cursorToUse = newHistory.pop() || '';
+        setCursorHistory(newHistory);
+      } else if (resetPagination) {
+        setCurrentCursor('');
+        setCursorHistory([]);
       }
-      
+
       const params = {
         limit: 20,
         search: searchQuery,
         filter: filter
       };
-      
-      if (!reset && nextCursor) {
-        params.cursor = nextCursor;
+
+      if (cursorToUse) {
+        params.cursor = cursorToUse;
       }
-      
+
       const response = await bookService.listBooks(params);
-      const newBooks = reset ? response.data.books : [...books, ...response.data.books];
-      
-      setBooks(newBooks);
-      setNextCursor(response.data.next_cursor || null);
-      setHasMore(response.data.has_more);
+
+      if (direction === 'next') {
+        // Save current cursor to history for potential previous navigation
+        setCursorHistory(prev => [...prev, currentCursor]);
+      }
+
+      setBooks(response.data.books);
+      setCurrentCursor(response.data.next_cursor || '');
+      setHasNextPage(response.data.has_more);
+      setHasPreviousPage(cursorHistory.length > 0 || (direction === 'next'));
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load books');
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -64,8 +76,8 @@ function BooksList() {
     try {
       setReturning(book.id);
       await borrowService.returnBook(book.id, book.current_member_id);
-      // Reload books to reflect changes
-      loadBooks(true);
+      // Reload current page
+      loadBooks(false);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to return book');
     } finally {
@@ -79,6 +91,18 @@ function BooksList() {
 
   const handleFilterChange = (e) => {
     setFilter(e.target.value);
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      loadBooks(false, 'next');
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (hasPreviousPage) {
+      loadBooks(false, 'prev');
+    }
   };
 
   return (
@@ -185,23 +209,32 @@ function BooksList() {
               )}
             </tbody>
           </table>
-          
-          {hasMore && (
-            <div className="text-center mt-3">
-              <button
-                className="btn btn-outline-primary"
-                onClick={() => loadBooks(false)}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Loading...
-                  </>
-                ) : (
-                  'Load More'
-                )}
-              </button>
+
+          {/* Pagination Controls */}
+          {(hasPreviousPage || hasNextPage) && (
+            <div className="d-flex justify-content-center mt-3">
+              <nav aria-label="Books pagination">
+                <ul className="pagination">
+                  <li className={`page-item ${!hasPreviousPage ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={handlePreviousPage}
+                      disabled={!hasPreviousPage}
+                    >
+                      Previous
+                    </button>
+                  </li>
+                  <li className={`page-item ${!hasNextPage ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={handleNextPage}
+                      disabled={!hasNextPage}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             </div>
           )}
         </div>
