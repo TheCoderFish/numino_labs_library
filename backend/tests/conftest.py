@@ -1,32 +1,29 @@
 import pytest
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import os
-from dotenv import load_dotenv
-from db_helper import init_db_pool, get_db_connection, return_db_connection
-
-load_dotenv()
+from sqlalchemy.orm import sessionmaker
+from db_helper import engine, Base, SessionLocal
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     """Setup test database"""
-    # Initialize the pool
-    init_db_pool()
+    # Create tables
+    Base.metadata.create_all(bind=engine)
     yield
-    # Cleanup after all tests
+    # Drop tables after all tests
+    Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
-def db_connection():
-    """Provide a database connection for tests"""
-    conn = get_db_connection()
-    yield conn
-    return_db_connection(conn)
+def db_session():
+    """Provide a database session for tests"""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 @pytest.fixture
-def clean_database(db_connection):
+def clean_database(db_session):
     """Clean all tables before each test"""
-    with db_connection.cursor() as cur:
-        cur.execute("DELETE FROM ledger")
-        cur.execute("DELETE FROM book")
-        cur.execute("DELETE FROM member")
-        db_connection.commit()
+    db_session.query(Base.metadata.tables['ledger']).delete()
+    db_session.query(Base.metadata.tables['book']).delete()
+    db_session.query(Base.metadata.tables['member']).delete()
+    db_session.commit()

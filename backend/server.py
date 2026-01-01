@@ -2,8 +2,7 @@ import os
 import grpc
 from concurrent import futures
 import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+from psycopg2 import IntegrityError
 from datetime import datetime, date
 from dotenv import load_dotenv
 import book_pb2
@@ -11,7 +10,9 @@ import member_pb2
 import ledger_pb2
 import library_pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
-from db_helper import DatabaseHelper, init_db_pool, db_pool
+from google.protobuf.json_format import ParseDict
+from db_helper import DatabaseHelper
+from messages import Messages
 
 load_dotenv()
 
@@ -20,28 +21,14 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def CreateBook(self, request, context):
         """Create a new book"""
         try:
-            result = DatabaseHelper.execute_query(
-                "INSERT INTO book (title, author, is_borrowed) VALUES (%s, %s, FALSE) RETURNING id, title, author, is_borrowed, current_member_id, created_at, updated_at",
-                (request.title, request.author),
-                fetch_one=True
-            )
-            
-            # Convert timestamps
-            created_at_ts = Timestamp()
-            created_at_ts.FromDatetime(result['created_at'])
-            updated_at_ts = Timestamp()
-            updated_at_ts.FromDatetime(result['updated_at'])
-            
-            book = book_pb2.Book(
-                id=result['id'],
-                title=result['title'],
-                author=result['author'],
-                is_borrowed=result['is_borrowed'],
-                current_member_id=result['current_member_id'] or 0,
-                created_at=created_at_ts,
-                updated_at=updated_at_ts
-            )
-            return book_pb2.CreateBookResponse(book=book, message="Book created successfully")
+            result = DatabaseHelper.create_book(request.title, request.author)
+            book = book_pb2.Book()
+            ParseDict(result, book, ignore_unknown_fields=True)
+            return book_pb2.CreateBookResponse(book=book, message=Messages.BOOK_CREATED)
+        except ValueError as e:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return book_pb2.CreateBookResponse()
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -50,32 +37,14 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def UpdateBook(self, request, context):
         """Update an existing book"""
         try:
-            result = DatabaseHelper.execute_query(
-                "UPDATE book SET title = %s, author = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING id, title, author, is_borrowed, current_member_id, created_at, updated_at",
-                (request.title, request.author, request.id),
-                fetch_one=True
-            )
+            result = DatabaseHelper.update_book(request.id, request.title, request.author)
             if not result:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Book not found")
                 return book_pb2.UpdateBookResponse()
-            
-            # Convert timestamps
-            created_at_ts = Timestamp()
-            created_at_ts.FromDatetime(result['created_at'])
-            updated_at_ts = Timestamp()
-            updated_at_ts.FromDatetime(result['updated_at'])
-            
-            book = book_pb2.Book(
-                id=result['id'],
-                title=result['title'],
-                author=result['author'],
-                is_borrowed=result['is_borrowed'],
-                current_member_id=result['current_member_id'] or 0,
-                created_at=created_at_ts,
-                updated_at=updated_at_ts
-            )
-            return book_pb2.UpdateBookResponse(book=book, message="Book updated successfully")
+            book = book_pb2.Book()
+            ParseDict(result, book, ignore_unknown_fields=True)
+            return book_pb2.UpdateBookResponse(book=book, message=Messages.BOOK_UPDATED)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -84,32 +53,12 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def ListBooks(self, request, context):
         """List all books with member name"""
         try:
-            results = DatabaseHelper.execute_query("""
-                SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id, b.created_at, b.updated_at,
-                       COALESCE(m.name, '') as current_member_name
-                FROM book b
-                LEFT JOIN member m ON b.current_member_id = m.id
-                ORDER BY b.id
-            """, fetch_all=True)
-            
+            results = DatabaseHelper.list_books()
             books = []
             for row in results:
-                created_at_ts = Timestamp()
-                created_at_ts.FromDatetime(row['created_at'])
-                updated_at_ts = Timestamp()
-                updated_at_ts.FromDatetime(row['updated_at'])
-                
-                books.append(book_pb2.Book(
-                    id=row['id'],
-                    title=row['title'],
-                    author=row['author'],
-                    is_borrowed=row['is_borrowed'],
-                    current_member_id=row['current_member_id'] or 0,
-                    current_member_name=row['current_member_name'] or '',
-                    created_at=created_at_ts,
-                    updated_at=updated_at_ts
-                ))
-            
+                book = book_pb2.Book()
+                ParseDict(row, book, ignore_unknown_fields=True)
+                books.append(book)
             return book_pb2.ListBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -119,35 +68,12 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def SearchBooks(self, request, context):
         """Search books by title or author"""
         try:
-            query = f"%{request.query}%"
-            results = DatabaseHelper.execute_query("""
-                SELECT b.id, b.title, b.author, b.is_borrowed, b.current_member_id, b.created_at, b.updated_at,
-                       COALESCE(m.name, '') as current_member_name
-                FROM book b
-                LEFT JOIN member m ON b.current_member_id = m.id
-                WHERE b.title ILIKE %s OR b.author ILIKE %s
-                ORDER BY b.title
-                LIMIT 50
-            """, (query, query), fetch_all=True)
-            
+            results = DatabaseHelper.search_books(request.query)
             books = []
             for row in results:
-                created_at_ts = Timestamp()
-                created_at_ts.FromDatetime(row['created_at'])
-                updated_at_ts = Timestamp()
-                updated_at_ts.FromDatetime(row['updated_at'])
-                
-                books.append(book_pb2.Book(
-                    id=row['id'],
-                    title=row['title'],
-                    author=row['author'],
-                    is_borrowed=row['is_borrowed'],
-                    current_member_id=row['current_member_id'] or 0,
-                    current_member_name=row['current_member_name'] or '',
-                    created_at=created_at_ts,
-                    updated_at=updated_at_ts
-                ))
-            
+                book = book_pb2.Book()
+                ParseDict(row, book, ignore_unknown_fields=True)
+                books.append(book)
             return book_pb2.SearchBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -157,28 +83,13 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def CreateMember(self, request, context):
         """Create a new member"""
         try:
-            result = DatabaseHelper.execute_query(
-                "INSERT INTO member (name, email) VALUES (%s, %s) RETURNING id, name, email, created_at, updated_at",
-                (request.name, request.email),
-                fetch_one=True
-            )
-            
-            created_at_ts = Timestamp()
-            created_at_ts.FromDatetime(result['created_at'])
-            updated_at_ts = Timestamp()
-            updated_at_ts.FromDatetime(result['updated_at'])
-            
-            member = member_pb2.Member(
-                id=result['id'],
-                name=result['name'],
-                email=result['email'],
-                created_at=created_at_ts,
-                updated_at=updated_at_ts
-            )
-            return member_pb2.CreateMemberResponse(member=member, message="Member created successfully")
-        except psycopg2.IntegrityError:
+            result = DatabaseHelper.create_member(request.name, request.email)
+            member = member_pb2.Member()
+            ParseDict(result, member, ignore_unknown_fields=True)
+            return member_pb2.CreateMemberResponse(member=member, message=Messages.MEMBER_CREATED)
+        except ValueError as e:
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-            context.set_details("Email already exists")
+            context.set_details(str(e))
             return member_pb2.CreateMemberResponse()
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -188,23 +99,12 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def ListMembers(self, request, context):
         """List all members"""
         try:
-            results = DatabaseHelper.execute_query("SELECT id, name, email, created_at, updated_at FROM member ORDER BY name", fetch_all=True)
-            
+            results = DatabaseHelper.list_members()
             members = []
             for row in results:
-                created_at_ts = Timestamp()
-                created_at_ts.FromDatetime(row['created_at'])
-                updated_at_ts = Timestamp()
-                updated_at_ts.FromDatetime(row['updated_at'])
-                
-                members.append(member_pb2.Member(
-                    id=row['id'],
-                    name=row['name'],
-                    email=row['email'],
-                    created_at=created_at_ts,
-                    updated_at=updated_at_ts
-                ))
-            
+                member = member_pb2.Member()
+                ParseDict(row, member, ignore_unknown_fields=True)
+                members.append(member)
             return member_pb2.ListMembersResponse(members=members)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -214,29 +114,12 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def SearchMembers(self, request, context):
         """Search members by name or email"""
         try:
-            query = f"%{request.query}%"
-            results = DatabaseHelper.execute_query("""
-                SELECT id, name, email, created_at, updated_at FROM member
-                WHERE name ILIKE %s OR email ILIKE %s
-                ORDER BY name
-                LIMIT 50
-            """, (query, query), fetch_all=True)
-            
+            results = DatabaseHelper.search_members(request.query)
             members = []
             for row in results:
-                created_at_ts = Timestamp()
-                created_at_ts.FromDatetime(row['created_at'])
-                updated_at_ts = Timestamp()
-                updated_at_ts.FromDatetime(row['updated_at'])
-                
-                members.append(member_pb2.Member(
-                    id=row['id'],
-                    name=row['name'],
-                    email=row['email'],
-                    created_at=created_at_ts,
-                    updated_at=updated_at_ts
-                ))
-            
+                member = member_pb2.Member()
+                ParseDict(row, member, ignore_unknown_fields=True)
+                members.append(member)
             return member_pb2.SearchMembersResponse(members=members)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -246,32 +129,17 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def UpdateMember(self, request, context):
         """Update an existing member"""
         try:
-            result = DatabaseHelper.execute_query(
-                "UPDATE member SET name = %s, email = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING id, name, email, created_at, updated_at",
-                (request.name, request.email, request.id),
-                fetch_one=True
-            )
+            result = DatabaseHelper.update_member(request.id, request.name, request.email)
             if not result:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("Member not found")
                 return member_pb2.UpdateMemberResponse()
-            
-            created_at_ts = Timestamp()
-            created_at_ts.FromDatetime(result['created_at'])
-            updated_at_ts = Timestamp()
-            updated_at_ts.FromDatetime(result['updated_at'])
-            
-            member = member_pb2.Member(
-                id=result['id'],
-                name=result['name'],
-                email=result['email'],
-                created_at=created_at_ts,
-                updated_at=updated_at_ts
-            )
-            return member_pb2.UpdateMemberResponse(member=member, message="Member updated successfully")
-        except psycopg2.IntegrityError:
+            member = member_pb2.Member()
+            ParseDict(result, member, ignore_unknown_fields=True)
+            return member_pb2.UpdateMemberResponse(member=member, message=Messages.MEMBER_UPDATED)
+        except ValueError as e:
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-            context.set_details("Email already exists")
+            context.set_details(str(e))
             return member_pb2.UpdateMemberResponse()
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -447,29 +315,12 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def ListBorrowedBooks(self, request, context):
         """List all books borrowed by a member"""
         try:
-            results = DatabaseHelper.execute_query(
-                "SELECT id, title, author, is_borrowed, current_member_id, created_at, updated_at FROM book WHERE current_member_id = %s AND is_borrowed = TRUE ORDER BY id",
-                (request.member_id,),
-                fetch_all=True
-            )
-            
+            results = DatabaseHelper.list_borrowed_books(request.member_id)
             books = []
             for row in results:
-                created_at_ts = Timestamp()
-                created_at_ts.FromDatetime(row['created_at'])
-                updated_at_ts = Timestamp()
-                updated_at_ts.FromDatetime(row['updated_at'])
-                
-                books.append(book_pb2.Book(
-                    id=row['id'],
-                    title=row['title'],
-                    author=row['author'],
-                    is_borrowed=row['is_borrowed'],
-                    current_member_id=row['current_member_id'] or 0,
-                    created_at=created_at_ts,
-                    updated_at=updated_at_ts
-                ))
-            
+                book = book_pb2.Book()
+                ParseDict(row, book, ignore_unknown_fields=True)
+                books.append(book)
             return ledger_pb2.ListBorrowedBooksResponse(books=books)
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -479,7 +330,9 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
 
 def serve():
     """Start the gRPC server"""
-    init_db_pool()
+    # Create tables if not exist
+    from db_helper import engine, Base
+    Base.metadata.create_all(bind=engine)
     
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     library_pb2_grpc.add_LibraryServiceServicer_to_server(LibraryService(), server)
@@ -493,7 +346,6 @@ def serve():
         server.wait_for_termination()
     except KeyboardInterrupt:
         server.stop(0)
-        db_pool.closeall()
 
 
 if __name__ == '__main__':

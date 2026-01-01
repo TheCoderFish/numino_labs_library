@@ -1,60 +1,196 @@
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
-# Database connection pool
-db_pool = None
+Base = declarative_base()
 
-def get_db_connection():
-    """Get a database connection from the pool"""
-    return db_pool.getconn()
+class Member(Base):
+    __tablename__ = 'member'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-def return_db_connection(conn):
-    """Return a connection to the pool"""
-    db_pool.putconn(conn)
+class Book(Base):
+    __tablename__ = 'book'
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    author = Column(String, nullable=False)
+    is_borrowed = Column(Boolean, default=False)
+    current_member_id = Column(Integer, ForeignKey('member.id'))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-def init_db_pool():
-    """Initialize the database connection pool"""
-    global db_pool
-    db_pool = psycopg2.pool.ThreadedConnectionPool(
-        1, 20,
-        host=os.getenv('DB_HOST', 'localhost'),
-        port=os.getenv('DB_PORT', '5435'),
-        database=os.getenv('DB_NAME', 'numino_db'),
-        user=os.getenv('DB_USER', 'numino_user'),
-        password=os.getenv('DB_PASSWORD', 'numino_password')
-    )
+class Ledger(Base):
+    __tablename__ = 'ledger'
+    id = Column(Integer, primary_key=True)
+    book_id = Column(Integer, ForeignKey('book.id'), nullable=False)
+    member_id = Column(Integer, ForeignKey('member.id'), nullable=False)
+    action_type = Column(String, nullable=False)  # 'BORROW' or 'RETURN'
+    log_date = Column(DateTime, default=datetime.utcnow)
+    due_date_snapshot = Column(DateTime)
+
+# Database setup
+DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class DatabaseHelper:
     @staticmethod
-    def execute_query(query, params=None, fetch_one=False, fetch_all=False):
-        """
-        Execute a database query with connection management.
-        
-        :param query: SQL query string
-        :param params: Parameters for the query
-        :param fetch_one: If True, return one row
-        :param fetch_all: If True, return all rows
-        :return: Query result or None
-        """
-        conn = get_db_connection()
+    def create_book(title, author):
+        db = SessionLocal()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(query, params)
-                if fetch_one:
-                    result = cur.fetchone()
-                elif fetch_all:
-                    result = cur.fetchall()
-                else:
-                    result = None
-                conn.commit()
-                return result
-        except Exception as e:
-            conn.rollback()
+            book = Book(title=title, author=author, is_borrowed=False)
+            db.add(book)
+            db.commit()
+            db.refresh(book)
+            return book.__dict__
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Book creation failed due to integrity constraint")
+        except SQLAlchemyError as e:
+            db.rollback()
             raise e
         finally:
-            return_db_connection(conn)
+            db.close()
+
+    @staticmethod
+    def update_book(book_id, title, author):
+        db = SessionLocal()
+        try:
+            book = db.query(Book).filter(Book.id == book_id).first()
+            if not book:
+                return None
+            book.title = title
+            book.author = author
+            book.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(book)
+            return book.__dict__
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_books():
+        db = SessionLocal()
+        try:
+            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member, Book.current_member_id == Member.id).all()
+            result = []
+            for book, member_name in books:
+                book_dict = book.__dict__.copy()
+                book_dict['current_member_name'] = member_name or ''
+                result.append(book_dict)
+            return result
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def search_books(query):
+        db = SessionLocal()
+        try:
+            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member, Book.current_member_id == Member.id).filter(
+                (Book.title.ilike(f"%{query}%")) | (Book.author.ilike(f"%{query}%"))
+            ).limit(50).all()
+            result = []
+            for book, member_name in books:
+                book_dict = book.__dict__.copy()
+                book_dict['current_member_name'] = member_name or ''
+                result.append(book_dict)
+            return result
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def create_member(name, email):
+        db = SessionLocal()
+        try:
+            member = Member(name=name, email=email)
+            db.add(member)
+            db.commit()
+            db.refresh(member)
+            return member.__dict__
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Email already exists")
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def update_member(member_id, name, email):
+        db = SessionLocal()
+        try:
+            member = db.query(Member).filter(Member.id == member_id).first()
+            if not member:
+                return None
+            member.name = name
+            member.email = email
+            member.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(member)
+            return member.__dict__
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Email already exists")
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_members():
+        db = SessionLocal()
+        try:
+            members = db.query(Member).all()
+            return [member.__dict__ for member in members]
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def search_members(query):
+        db = SessionLocal()
+        try:
+            members = db.query(Member).filter(
+                (Member.name.ilike(f"%{query}%")) | (Member.email.ilike(f"%{query}%"))
+            ).limit(50).all()
+            return [member.__dict__ for member in members]
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_borrowed_books(member_id):
+        db = SessionLocal()
+        try:
+            books = db.query(Book).filter(Book.current_member_id == member_id, Book.is_borrowed == True).all()
+            return [book.__dict__ for book in books]
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
