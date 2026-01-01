@@ -51,7 +51,8 @@ function CreateMember() {
         navigate('/members');
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to load member');
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || 'Failed to load member';
+      toast.error(errorMessage);
       navigate('/members');
     } finally {
       setLoadingMember(false);
@@ -110,7 +111,7 @@ function CreateMember() {
         navigate('/members');
       }, 1000);
     } catch (err) {
-      const errorMessage = err.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} member`;
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} member`;
       toast.error(errorMessage);
     } finally {
       setLoading(false);

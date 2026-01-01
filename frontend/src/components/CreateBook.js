@@ -51,7 +51,8 @@ function CreateBook() {
         navigate('/books');
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to load book');
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || 'Failed to load book';
+      toast.error(errorMessage);
       navigate('/books');
     } finally {
       setLoadingBook(false);
@@ -110,7 +111,7 @@ function CreateBook() {
         navigate('/books');
       }, 1000);
     } catch (err) {
-      const errorMessage = err.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} book`;
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} book`;
       toast.error(errorMessage);
     } finally {
       setLoading(false);
