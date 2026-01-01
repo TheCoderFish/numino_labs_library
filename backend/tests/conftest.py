@@ -3,7 +3,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
-from server import init_db_pool, get_db_connection, return_db_connection
+from db_helper import init_db_pool, get_db_connection, return_db_connection
 
 load_dotenv()
 
