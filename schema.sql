@@ -27,7 +27,7 @@ CREATE TABLE ledger (
     member_id INTEGER REFERENCES member(id),
     action_type TEXT NOT NULL, -- 'BORROW' or 'RETURN'
     log_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    due_date_snapshot DATE -- Added for O(1) delay calculation
+    due_date_snapshot TIMESTAMP -- Added for O(1) delay calculation
 );
 
 -- Create indexes for better query performance

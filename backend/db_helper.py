@@ -97,6 +97,7 @@ class DatabaseHelper:
             # Convert datetime objects to ISO strings for ParseDict
             if isinstance(value, datetime):
                 data[key] = value.strftime('%Y-%m-%dT%H:%M:%SZ')
+
         return data
 
     @staticmethod
@@ -279,5 +280,82 @@ class DatabaseHelper:
         db = SessionLocal()
         try:
             return Book.is_borrowed_by_member(db, book_id, member_id)
+        finally:
+            db.close()
+
+    @staticmethod
+    def borrow_book(book_id, member_id):
+        db = SessionLocal()
+        try:
+            # Get the book
+            book = db.query(Book).filter(Book.id == book_id).first()
+            if not book:
+                raise ValueError("Book not found")
+            if book.is_borrowed:
+                raise ValueError("Book is already borrowed")
+
+            # Get the member
+            member = db.query(Member).filter(Member.id == member_id).first()
+            if not member:
+                raise ValueError("Member not found")
+
+            # Update book
+            book.is_borrowed = True
+            book.current_member_id = member_id
+            book.updated_at = datetime.utcnow()
+
+            # Create ledger entry
+            ledger_entry = Ledger(
+                book_id=book_id,
+                member_id=member_id,
+                action_type='BORROW',
+                due_date_snapshot=datetime.utcnow()  # You can add logic for due date calculation
+            )
+            db.add(ledger_entry)
+
+            db.commit()
+            db.refresh(ledger_entry)
+
+            return DatabaseHelper.sqlalchemy_to_dict(ledger_entry)
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def return_book(book_id, member_id):
+        db = SessionLocal()
+        try:
+            # Get the book
+            book = db.query(Book).filter(Book.id == book_id).first()
+            if not book:
+                raise ValueError("Book not found")
+            if not book.is_borrowed:
+                raise ValueError("Book is not currently borrowed")
+            if book.current_member_id != member_id:
+                raise ValueError("This member did not borrow this book")
+
+            # Update book
+            book.is_borrowed = False
+            book.current_member_id = None
+            book.updated_at = datetime.utcnow()
+
+            # Create ledger entry
+            ledger_entry = Ledger(
+                book_id=book_id,
+                member_id=member_id,
+                action_type='RETURN',
+                due_date_snapshot=None
+            )
+            db.add(ledger_entry)
+
+            db.commit()
+            db.refresh(ledger_entry)
+
+            return DatabaseHelper.sqlalchemy_to_dict(ledger_entry)
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise e
         finally:
             db.close()

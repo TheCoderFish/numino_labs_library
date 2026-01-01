@@ -18,5 +18,5 @@ fi
 
 # Start the server
 echo "Starting gateway server on port $PORT..."
-node server.js
+npm start
 

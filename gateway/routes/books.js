@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const { handleGrpcError, handleValidationError } = require('../utils/errorHandler');
 
 // Middleware for validation
 const validateBookInput = (req, res, next) => {
     const { title, author } = req.body;
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
-        return res.status(400).json({ error: 'Title is required and must be a non-empty string' });
+        return handleValidationError('INVALID_TITLE', 'Title is required and must be a non-empty string', res);
     }
     if (!author || typeof author !== 'string' || author.trim().length === 0) {
-        return res.status(400).json({ error: 'Author is required and must be a non-empty string' });
+        return handleValidationError('INVALID_AUTHOR', 'Author is required and must be a non-empty string', res);
     }
     next();
 };
@@ -16,7 +17,7 @@ const validateBookInput = (req, res, next) => {
 const validateBookId = (req, res, next) => {
     const { id } = req.params;
     if (!id || isNaN(parseInt(id))) {
-        return res.status(400).json({ error: 'Valid book ID is required' });
+        return handleValidationError('INVALID_BOOK_ID', 'Valid book ID is required', res);
     }
     next();
 };
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
         const response = await promisifyGrpcCall(client.ListBooks, {});
         res.json(response.books);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
@@ -59,7 +60,7 @@ router.get('/search', async (req, res) => {
         const response = await promisifyGrpcCall(client.SearchBooks, { query: q });
         res.json(response.books);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
@@ -69,7 +70,7 @@ router.post('/', validateBookInput, async (req, res) => {
         const response = await promisifyGrpcCall(client.CreateBook, { title, author });
         res.status(201).json(response);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
@@ -84,11 +85,7 @@ router.put('/:id', validateBookId, validateBookInput, async (req, res) => {
         });
         res.json(response);
     } catch (error) {
-        if (error.code === 5) { // NOT_FOUND
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        handleGrpcError(error, res);
     }
 });
 
@@ -101,7 +98,7 @@ router.patch('/:id', validateBookId, async (req, res) => {
         const currentBook = listResponse.books.find(book => book.id === parseInt(id));
 
         if (!currentBook) {
-            return res.status(404).json({ error: 'Book not found' });
+            return handleValidationError('BOOK_NOT_FOUND', 'Book not found', res, 404);
         }
 
         // Merge provided fields with current data
@@ -110,10 +107,10 @@ router.patch('/:id', validateBookId, async (req, res) => {
 
         // Basic validation for merged data
         if (!updatedTitle || typeof updatedTitle !== 'string' || updatedTitle.trim().length === 0) {
-            return res.status(400).json({ error: 'Title must be a non-empty string' });
+            return handleValidationError('INVALID_TITLE', 'Title must be a non-empty string', res);
         }
         if (!updatedAuthor || typeof updatedAuthor !== 'string' || updatedAuthor.trim().length === 0) {
-            return res.status(400).json({ error: 'Author must be a non-empty string' });
+            return handleValidationError('INVALID_AUTHOR', 'Author must be a non-empty string', res);
         }
 
         // Update the book
@@ -124,11 +121,7 @@ router.patch('/:id', validateBookId, async (req, res) => {
         });
         res.json(response);
     } catch (error) {
-        if (error.code === 5) { // NOT_FOUND
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        handleGrpcError(error, res);
     }
 });
 

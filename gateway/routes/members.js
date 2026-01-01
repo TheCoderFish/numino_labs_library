@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const { handleGrpcError, handleValidationError } = require('../utils/errorHandler');
 
 // Middleware for validation
 const validateMemberInput = (req, res, next) => {
     const { name, email } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Name is required and must be a non-empty string' });
+        return handleValidationError('INVALID_NAME', 'Name is required and must be a non-empty string', res);
     }
     if (!email || typeof email !== 'string' || !email.includes('@')) {
-        return res.status(400).json({ error: 'Valid email is required' });
+        return handleValidationError('INVALID_EMAIL', 'Valid email is required', res);
     }
     next();
 };
@@ -16,7 +17,7 @@ const validateMemberInput = (req, res, next) => {
 const validateMemberId = (req, res, next) => {
     const { id } = req.params;
     if (!id || isNaN(parseInt(id))) {
-        return res.status(400).json({ error: 'Valid member ID is required' });
+        return handleValidationError('INVALID_MEMBER_ID', 'Valid member ID is required', res);
     }
     next();
 };
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
         const response = await promisifyGrpcCall(client.ListMembers, {});
         res.json(response.members);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
@@ -59,7 +60,7 @@ router.get('/search', async (req, res) => {
         const response = await promisifyGrpcCall(client.SearchMembers, { query: q });
         res.json(response.members);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
@@ -69,11 +70,7 @@ router.post('/', validateMemberInput, async (req, res) => {
         const response = await promisifyGrpcCall(client.CreateMember, { name, email });
         res.status(201).json(response);
     } catch (error) {
-        if (error.code === 6) { // ALREADY_EXISTS
-            res.status(409).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        handleGrpcError(error, res);
     }
 });
 
@@ -88,13 +85,7 @@ router.put('/:id', validateMemberId, validateMemberInput, async (req, res) => {
         });
         res.json(response);
     } catch (error) {
-        if (error.code === 5) { // NOT_FOUND
-            res.status(404).json({ error: error.message });
-        } else if (error.code === 6) { // ALREADY_EXISTS
-            res.status(409).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        handleGrpcError(error, res);
     }
 });
 
@@ -106,7 +97,7 @@ router.get('/:id/borrowed-books', validateMemberId, async (req, res) => {
         });
         res.json(response.books);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        handleGrpcError(error, res);
     }
 });
 
