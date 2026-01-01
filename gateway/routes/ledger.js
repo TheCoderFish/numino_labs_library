@@ -50,8 +50,8 @@ function promisifyGrpcCall(clientMethod, request) {
 
 // Helper function to convert protobuf timestamp to ISO string
 function timestampToISOString(ts) {
-    if (!ts) return null;
-    return ts.toDate().toISOString();
+    if (!ts || !ts.seconds) return null;
+    return new Date(ts.seconds * 1000 + (ts.nanos || 0) / 1000000).toISOString();
 }
 
 // Helper function to convert ledger entry to plain object
