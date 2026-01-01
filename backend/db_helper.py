@@ -213,3 +213,25 @@ class DatabaseHelper:
             raise e
         finally:
             db.close()
+
+    @staticmethod
+    def get_book_by_id(book_id):
+        db = SessionLocal()
+        try:
+            book = db.query(Book).filter(Book.id == book_id).first()
+            return DatabaseHelper.sqlalchemy_to_dict(book) if book else None
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_member_by_id(member_id):
+        db = SessionLocal()
+        try:
+            member = db.query(Member).filter(Member.id == member_id).first()
+            return DatabaseHelper.sqlalchemy_to_dict(member) if member else None
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
