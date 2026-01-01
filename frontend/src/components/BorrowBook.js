@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { bookService, memberService, borrowService } from '../services/api';
 
 function BorrowBook() {
@@ -19,8 +20,6 @@ function BorrowBook() {
   const [loading, setLoading] = useState(false);
   const [booksLoading, setBooksLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -131,22 +130,22 @@ function BorrowBook() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.book_id || !formData.member_id) {
-      setError('Please select both a book and a member');
+      const errorMsg = 'Please select both a book and a member';
+      toast.error(errorMsg);
       return;
     }
 
     setLoading(true);
-    setError(null);
-    setSuccess(false);
 
     try {
       await borrowService.borrowBook(formData.book_id, formData.member_id);
-      setSuccess(true);
+      toast.success('Book borrowed successfully!');
       setFormData({ book_id: '', book_title: '', member_id: '', member_name: '' });
       setBookSearch('');
       setMemberSearch('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to borrow book');
+      const errorMsg = err.response?.data?.error || 'Failed to borrow book';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -156,18 +155,6 @@ function BorrowBook() {
     <div className="row justify-content-center">
       <div className="col-md-8">
         <h2>Borrow a Book</h2>
-
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="alert alert-success" role="alert">
-            Book borrowed successfully!
-          </div>
-        )}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">

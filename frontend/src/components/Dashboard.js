@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { bookService, borrowService } from '../services/api';
 
 function Dashboard() {
@@ -18,7 +19,9 @@ function Dashboard() {
       setBooks(response.data);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load recent books');
+      const errorMessage = err.response?.data?.error || 'Failed to load recent books';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -36,9 +39,10 @@ function Dashboard() {
     try {
       setReturning(book.id);
       await borrowService.returnBook(book.id, book.current_member_id);
+      toast.success(`"${book.title}" returned successfully!`);
       await loadRecentBooks();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to return book');
+      toast.error(err.response?.data?.error || 'Failed to return book');
     } finally {
       setReturning(null);
     }

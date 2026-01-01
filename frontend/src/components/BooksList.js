@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { bookService, borrowService } from '../services/api';
 
 function BooksList() {
@@ -58,7 +59,9 @@ function BooksList() {
       setHasPreviousPage(cursorHistory.length > 0 || (direction === 'next'));
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load books');
+      const errorMessage = err.response?.data?.error || 'Failed to load books';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -76,10 +79,11 @@ function BooksList() {
     try {
       setReturning(book.id);
       await borrowService.returnBook(book.id, book.current_member_id);
+      toast.success(`"${book.title}" returned successfully!`);
       // Reload current page
       loadBooks(false);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to return book');
+      toast.error(err.response?.data?.error || 'Failed to return book');
     } finally {
       setReturning(null);
     }
@@ -188,21 +192,30 @@ function BooksList() {
                     </td>
                     <td>{book.current_member_name || '-'}</td>
                     <td>
-                      {book.is_borrowed ? (
-                        <button
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => handleReturn(book)}
-                          disabled={returning === book.id}
+                      <div className="d-flex gap-2">
+                        <Link
+                          to={`/books/${book.id}/edit`}
+                          state={{ book }}
+                          className="btn btn-sm btn-outline-secondary"
                         >
-                          {returning === book.id ? (
-                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                          ) : (
-                            'Return'
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
+                          Edit
+                        </Link>
+                        {book.is_borrowed ? (
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => handleReturn(book)}
+                            disabled={returning === book.id}
+                          >
+                            {returning === book.id ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            ) : (
+                              'Return'
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-muted">-</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

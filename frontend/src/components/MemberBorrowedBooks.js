@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { borrowService } from '../services/api';
 
 function MemberBorrowedBooks() {
@@ -22,7 +23,9 @@ function MemberBorrowedBooks() {
       setMemberName(`Member ${id}`);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load borrowed books');
+      const errorMessage = err.response?.data?.error || 'Failed to load borrowed books';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

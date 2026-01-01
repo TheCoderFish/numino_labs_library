@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { memberService } from '../services/api';
 
 function MembersList() {
@@ -59,7 +60,9 @@ function MembersList() {
       setHasPreviousPage(updatedHistory.length > 0);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load members');
+      const errorMessage = err.response?.data?.error || 'Failed to load members';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -145,9 +148,18 @@ function MembersList() {
                     <td>{member.name}</td>
                     <td>{member.email}</td>
                     <td>
-                      <Link to={`/members/${member.id}/borrowed-books`} className="btn btn-sm btn-outline-primary">
-                        View Borrowed Books
-                      </Link>
+                      <div className="d-flex gap-2">
+                        <Link
+                          to={`/members/${member.id}/edit`}
+                          state={{ member }}
+                          className="btn btn-sm btn-outline-secondary"
+                        >
+                          Edit
+                        </Link>
+                        <Link to={`/members/${member.id}/borrowed-books`} className="btn btn-sm btn-outline-primary">
+                          View Borrowed Books
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))
