@@ -1,3 +1,4 @@
+import json
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -9,6 +10,7 @@ load_dotenv()
 
 Base = declarative_base()
 
+
 class Member(Base):
     __tablename__ = 'member'
     id = Column(Integer, primary_key=True)
@@ -16,6 +18,7 @@ class Member(Base):
     email = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class Book(Base):
     __tablename__ = 'book'
@@ -27,6 +30,7 @@ class Book(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
 class Ledger(Base):
     __tablename__ = 'ledger'
     id = Column(Integer, primary_key=True)
@@ -36,10 +40,12 @@ class Ledger(Base):
     log_date = Column(DateTime, default=datetime.utcnow)
     due_date_snapshot = Column(DateTime)
 
+
 # Database setup
 DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
@@ -48,7 +54,17 @@ def get_db():
     finally:
         db.close()
 
+
 class DatabaseHelper:
+    @staticmethod
+    def sqlalchemy_to_dict(obj):
+        data = {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+        for key, value in data.items():
+            # Convert datetime objects to ISO strings for ParseDict
+            if isinstance(value, datetime):
+                data[key] = value.isoformat() + "Z"
+        return data
+
     @staticmethod
     def create_book(title, author):
         db = SessionLocal()
@@ -57,7 +73,7 @@ class DatabaseHelper:
             db.add(book)
             db.commit()
             db.refresh(book)
-            return book.__dict__
+            return DatabaseHelper.sqlalchemy_to_dict(book)
         except IntegrityError:
             db.rollback()
             raise ValueError("Book creation failed due to integrity constraint")
@@ -90,7 +106,8 @@ class DatabaseHelper:
     def list_books():
         db = SessionLocal()
         try:
-            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member, Book.current_member_id == Member.id).all()
+            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member,
+                                                                                       Book.current_member_id == Member.id).all()
             result = []
             for book, member_name in books:
                 book_dict = book.__dict__.copy()
@@ -106,7 +123,8 @@ class DatabaseHelper:
     def search_books(query):
         db = SessionLocal()
         try:
-            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member, Book.current_member_id == Member.id).filter(
+            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member,
+                                                                                       Book.current_member_id == Member.id).filter(
                 (Book.title.ilike(f"%{query}%")) | (Book.author.ilike(f"%{query}%"))
             ).limit(50).all()
             result = []
