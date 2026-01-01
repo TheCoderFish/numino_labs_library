@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { bookService, borrowService } from '../services/api';
+import ConfirmationModal from './ConfirmationModal';
 
 function BooksList() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [returning, setReturning] = useState(null);
+  const [bookToReturn, setBookToReturn] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [currentCursor, setCurrentCursor] = useState('');
@@ -67,19 +69,21 @@ function BooksList() {
     }
   };
 
-  const handleReturn = async (book) => {
+  const handleReturnClick = (book) => {
     if (!book.is_borrowed || !book.current_member_id) {
       return;
     }
+    setBookToReturn(book);
+  };
 
-    if (!window.confirm(`Return "${book.title}"?`)) {
-      return;
-    }
+  const handleReturnConfirm = async () => {
+    if (!bookToReturn) return;
 
     try {
-      setReturning(book.id);
-      await borrowService.returnBook(book.id, book.current_member_id);
-      toast.success(`"${book.title}" returned successfully!`);
+      setReturning(bookToReturn.id);
+      await borrowService.returnBook(bookToReturn.id, bookToReturn.current_member_id);
+      toast.success(`"${bookToReturn.title}" returned successfully!`);
+      setBookToReturn(null);
       // Reload current page
       loadBooks(false);
     } catch (err) {
@@ -87,6 +91,10 @@ function BooksList() {
     } finally {
       setReturning(null);
     }
+  };
+
+  const handleReturnCancel = () => {
+    setBookToReturn(null);
   };
 
   const handleSearchChange = (e) => {
@@ -203,7 +211,7 @@ function BooksList() {
                         {book.is_borrowed ? (
                           <button
                             className="btn btn-sm btn-outline-primary"
-                            onClick={() => handleReturn(book)}
+                            onClick={() => handleReturnClick(book)}
                             disabled={returning === book.id}
                           >
                             {returning === book.id ? (
@@ -252,6 +260,18 @@ function BooksList() {
           )}
         </div>
       )}
+
+      <ConfirmationModal
+        show={!!bookToReturn}
+        onConfirm={handleReturnConfirm}
+        onCancel={handleReturnCancel}
+        title="Return Book"
+        message={bookToReturn ? `Are you sure you want to return "${bookToReturn.title}"?` : ''}
+        confirmText="Return"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        isProcessing={returning === bookToReturn?.id}
+      />
     </div>
   );
 }
