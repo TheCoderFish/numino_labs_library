@@ -59,10 +59,11 @@ class DatabaseHelper:
     @staticmethod
     def sqlalchemy_to_dict(obj):
         data = {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+        data.pop('_sa_instance_state', None)
         for key, value in data.items():
             # Convert datetime objects to ISO strings for ParseDict
             if isinstance(value, datetime):
-                data[key] = value.isoformat() + "Z"
+                data[key] = value.strftime('%Y-%m-%dT%H:%M:%SZ')
         return data
 
     @staticmethod
@@ -95,7 +96,7 @@ class DatabaseHelper:
             book.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(book)
-            return book.__dict__
+            return DatabaseHelper.sqlalchemy_to_dict(book)
         except SQLAlchemyError as e:
             db.rollback()
             raise e
@@ -110,7 +111,7 @@ class DatabaseHelper:
                                                                                        Book.current_member_id == Member.id).all()
             result = []
             for book, member_name in books:
-                book_dict = book.__dict__.copy()
+                book_dict = DatabaseHelper.sqlalchemy_to_dict(book)
                 book_dict['current_member_name'] = member_name or ''
                 result.append(book_dict)
             return result
@@ -129,7 +130,7 @@ class DatabaseHelper:
             ).limit(50).all()
             result = []
             for book, member_name in books:
-                book_dict = book.__dict__.copy()
+                book_dict = DatabaseHelper.sqlalchemy_to_dict(book)
                 book_dict['current_member_name'] = member_name or ''
                 result.append(book_dict)
             return result
@@ -146,7 +147,7 @@ class DatabaseHelper:
             db.add(member)
             db.commit()
             db.refresh(member)
-            return member.__dict__
+            return DatabaseHelper.sqlalchemy_to_dict(member)
         except IntegrityError:
             db.rollback()
             raise ValueError("Email already exists")
@@ -168,7 +169,7 @@ class DatabaseHelper:
             member.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(member)
-            return member.__dict__
+            return DatabaseHelper.sqlalchemy_to_dict(member)
         except IntegrityError:
             db.rollback()
             raise ValueError("Email already exists")
@@ -183,7 +184,7 @@ class DatabaseHelper:
         db = SessionLocal()
         try:
             members = db.query(Member).all()
-            return [member.__dict__ for member in members]
+            return [DatabaseHelper.sqlalchemy_to_dict(member) for member in members]
         except SQLAlchemyError as e:
             raise e
         finally:
@@ -196,7 +197,7 @@ class DatabaseHelper:
             members = db.query(Member).filter(
                 (Member.name.ilike(f"%{query}%")) | (Member.email.ilike(f"%{query}%"))
             ).limit(50).all()
-            return [member.__dict__ for member in members]
+            return [DatabaseHelper.sqlalchemy_to_dict(member) for member in members]
         except SQLAlchemyError as e:
             raise e
         finally:
@@ -207,7 +208,7 @@ class DatabaseHelper:
         db = SessionLocal()
         try:
             books = db.query(Book).filter(Book.current_member_id == member_id, Book.is_borrowed == True).all()
-            return [book.__dict__ for book in books]
+            return [DatabaseHelper.sqlalchemy_to_dict(book) for book in books]
         except SQLAlchemyError as e:
             raise e
         finally:
