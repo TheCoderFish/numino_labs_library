@@ -11,9 +11,8 @@ import ledger_pb2
 import library_pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.json_format import ParseDict
-from db_helper import DatabaseHelper
+from db_helper import DatabaseHelper, Book, Member
 from messages import Messages
-from business_logic import BusinessLogic
 
 load_dotenv()
 
@@ -22,7 +21,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def CreateBook(self, request, context):
         """Create a new book"""
         try:
-            BusinessLogic.validate_book_data(request.title, request.author)
+            Book.validate_data(request.title, request.author)
             result = DatabaseHelper.create_book(request.title, request.author)
             book = book_pb2.Book()
             ParseDict(result, book, ignore_unknown_fields=True)
@@ -39,7 +38,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def UpdateBook(self, request, context):
         """Update an existing book"""
         try:
-            BusinessLogic.validate_book_data(request.title, request.author)
+            Book.validate_data(request.title, request.author)
             result = DatabaseHelper.update_book(request.id, request.title, request.author)
             if not result:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -90,7 +89,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def CreateMember(self, request, context):
         """Create a new member"""
         try:
-            BusinessLogic.validate_member_data(request.name, request.email)
+            Member.validate_data(request.name, request.email)
             result = DatabaseHelper.create_member(request.name, request.email)
             member = member_pb2.Member()
             ParseDict(result, member, ignore_unknown_fields=True)
@@ -137,7 +136,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def UpdateMember(self, request, context):
         """Update an existing member"""
         try:
-            BusinessLogic.validate_member_data(request.name, request.email)
+            Member.validate_data(request.name, request.email)
             result = DatabaseHelper.update_member(request.id, request.name, request.email)
             if not result:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -161,11 +160,11 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def BorrowBook(self, request, context):
         """Borrow a book with transaction and locking"""
         # Business logic validations
-        if not BusinessLogic.is_book_available(request.book_id):
+        if not DatabaseHelper.is_book_available(request.book_id):
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details("Book is not available")
             return ledger_pb2.BorrowBookResponse()
-        if not BusinessLogic.member_exists(request.member_id):
+        if not DatabaseHelper.member_exists(request.member_id):
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details("Member not found")
             return ledger_pb2.BorrowBookResponse()
@@ -257,7 +256,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
     def ReturnBook(self, request, context):
         """Return a book with transaction and locking"""
         # Business logic validations
-        if not BusinessLogic.is_book_borrowed_by_member(request.book_id, request.member_id):
+        if not DatabaseHelper.is_book_borrowed_by_member(request.book_id, request.member_id):
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details("Book is not borrowed by this member")
             return ledger_pb2.ReturnBookResponse()

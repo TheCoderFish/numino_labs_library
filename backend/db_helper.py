@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -19,6 +20,21 @@ class Member(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @classmethod
+    def validate_data(cls, name, email):
+        if not name or not name.strip():
+            raise ValueError("Name is required and cannot be empty")
+        if not email or not email.strip():
+            raise ValueError("Email is required and cannot be empty")
+        # Basic email validation
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            raise ValueError("Invalid email format")
+
+    @classmethod
+    def exists(cls, session, member_id):
+        member = session.query(cls).filter(cls.id == member_id).first()
+        return member is not None
+
 
 class Book(Base):
     __tablename__ = 'book'
@@ -29,6 +45,23 @@ class Book(Base):
     current_member_id = Column(Integer, ForeignKey('member.id'))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def validate_data(cls, title, author):
+        if not title or not title.strip():
+            raise ValueError("Title is required and cannot be empty")
+        if not author or not author.strip():
+            raise ValueError("Author is required and cannot be empty")
+
+    @classmethod
+    def is_available(cls, session, book_id):
+        book = session.query(cls).filter(cls.id == book_id).first()
+        return book and not book.is_borrowed
+
+    @classmethod
+    def is_borrowed_by_member(cls, session, book_id, member_id):
+        book = session.query(cls).filter(cls.id == book_id).first()
+        return book and book.is_borrowed and book.current_member_id == member_id
 
 
 class Ledger(Base):
@@ -226,12 +259,25 @@ class DatabaseHelper:
             db.close()
 
     @staticmethod
-    def get_member_by_id(member_id):
+    def is_book_available(book_id):
         db = SessionLocal()
         try:
-            member = db.query(Member).filter(Member.id == member_id).first()
-            return DatabaseHelper.sqlalchemy_to_dict(member) if member else None
-        except SQLAlchemyError as e:
-            raise e
+            return Book.is_available(db, book_id)
+        finally:
+            db.close()
+
+    @staticmethod
+    def member_exists(member_id):
+        db = SessionLocal()
+        try:
+            return Member.exists(db, member_id)
+        finally:
+            db.close()
+
+    @staticmethod
+    def is_book_borrowed_by_member(book_id, member_id):
+        db = SessionLocal()
+        try:
+            return Book.is_borrowed_by_member(db, book_id, member_id)
         finally:
             db.close()
