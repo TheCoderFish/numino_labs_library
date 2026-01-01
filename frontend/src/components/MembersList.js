@@ -6,22 +6,51 @@ function MembersList() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    loadMembers();
-  }, []);
+    loadMembers(true);
+  }, [searchQuery]);
 
-  const loadMembers = async () => {
+  const loadMembers = async (reset = false) => {
     try {
-      setLoading(true);
-      const response = await memberService.listMembers();
-      setMembers(response.data);
+      if (reset) {
+        setLoading(true);
+        setMembers([]);
+        setNextCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      const params = {
+        limit: 20,
+        search: searchQuery
+      };
+      
+      if (!reset && nextCursor) {
+        params.cursor = nextCursor;
+      }
+      
+      const response = await memberService.listMembers(params);
+      const newMembers = reset ? response.data.members : [...members, ...response.data.members];
+      
+      setMembers(newMembers);
+      setNextCursor(response.data.next_cursor || null);
+      setHasMore(response.data.has_more);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load members');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
   };
 
   return (
@@ -29,12 +58,25 @@ function MembersList() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Members</h2>
         <div>
-          <Link to="/create-member" className="btn btn-primary">
+          <Link to="/create-member" className="btn btn-primary me-2">
             Add Member
           </Link>
-          <button className="btn btn-outline-secondary ms-2" onClick={loadMembers}>
+          <button className="btn btn-outline-secondary" onClick={() => loadMembers(true)}>
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Search Control */}
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+          />
         </div>
       </div>
 
@@ -84,6 +126,25 @@ function MembersList() {
               )}
             </tbody>
           </table>
+          
+          {hasMore && (
+            <div className="text-center mt-3">
+              <button
+                className="btn btn-outline-primary"
+                onClick={() => loadMembers(false)}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

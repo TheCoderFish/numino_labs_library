@@ -38,10 +38,15 @@ message UpdateMemberResponse {
 
 // List Members Request/Response
 message ListMembersRequest {
+    int32 limit = 1;
+    string cursor = 2; // For cursor-based pagination
+    string search = 3; // Search query for name/email
 }
 
 message ListMembersResponse {
     repeated Member members = 1;
+    string next_cursor = 2;
+    bool has_more = 3;
 }
 
 // Search Members Request/Response

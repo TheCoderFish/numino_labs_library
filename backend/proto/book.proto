@@ -41,9 +41,24 @@ message UpdateBookResponse {
 
 // List Books Request/Response
 message ListBooksRequest {
+    int32 limit = 1;
+    string cursor = 2; // For cursor-based pagination
+    string filter = 3; // 'all', 'available', 'borrowed'
+    string search = 4; // Search query for title/author
 }
 
 message ListBooksResponse {
+    repeated Book books = 1;
+    string next_cursor = 2;
+    bool has_more = 3;
+}
+
+// List Recent Books Request/Response
+message ListRecentBooksRequest {
+    int32 limit = 1;
+}
+
+message ListRecentBooksResponse {
     repeated Book books = 1;
 }
 

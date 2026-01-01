@@ -45,11 +45,21 @@ function promisifyGrpcCall(clientMethod, request) {
 
 // Routes
 router.get('/', async (req, res) => {
-    logger.info('GET /api/members - ListMembers operation started');
+    const { limit, cursor, search } = req.query;
+    logger.info(`GET /api/members - ListMembers operation started with limit: ${limit}, cursor: ${cursor}, search: ${search}`);
     try {
-        const response = await promisifyGrpcCall(client.ListMembers, {});
-        logger.info(`GET /api/members - ListMembers operation successful, returned ${response.members.length} members`);
-        res.json(response.members);
+        const request = {
+            limit: limit ? parseInt(limit) : 20,
+            cursor: cursor || '',
+            search: search || ''
+        };
+        const response = await promisifyGrpcCall(client.ListMembers, request);
+        logger.info(`GET /api/members - ListMembers operation successful, returned ${response.members.length} members, has_more: ${response.has_more}`);
+        res.json({
+            members: response.members,
+            next_cursor: response.next_cursor,
+            has_more: response.has_more
+        });
     } catch (error) {
         logger.error(`${config.ERROR_KEYWORD} GET /api/members - ListMembers operation failed: ${error.message}`);
         handleGrpcError(error, res);

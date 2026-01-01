@@ -155,6 +155,72 @@ class DatabaseHelper:
             db.close()
 
     @staticmethod
+    def list_recent_books(limit=20):
+        db = SessionLocal()
+        try:
+            books = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member,
+                                                                                       Book.current_member_id == Member.id).order_by(Book.updated_at.desc()).limit(limit).all()
+            result = []
+            for book, member_name in books:
+                book_dict = DatabaseHelper.sqlalchemy_to_dict(book)
+                book_dict['current_member_name'] = member_name or ''
+                result.append(book_dict)
+            return result
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_books_paginated(limit=20, cursor=None, filter_type='all', search=None):
+        db = SessionLocal()
+        try:
+            query = db.query(Book, Member.name.label('current_member_name')).outerjoin(Member,
+                                                                                       Book.current_member_id == Member.id)
+            
+            # Apply search filter
+            if search:
+                query = query.filter(
+                    (Book.title.ilike(f"%{search}%")) | (Book.author.ilike(f"%{search}%"))
+                )
+            
+            # Apply status filter
+            if filter_type == 'available':
+                query = query.filter(Book.is_borrowed == False)
+            elif filter_type == 'borrowed':
+                query = query.filter(Book.is_borrowed == True)
+            
+            # Apply cursor for pagination
+            if cursor:
+                try:
+                    cursor_id = int(cursor)
+                    query = query.filter(Book.id > cursor_id)
+                except ValueError:
+                    pass  # Invalid cursor, ignore
+            
+            # Order by ID for consistent pagination
+            query = query.order_by(Book.id)
+            
+            # Limit results
+            books = query.limit(limit + 1).all()  # +1 to check if there are more
+            
+            result = []
+            for book, member_name in books[:limit]:
+                book_dict = DatabaseHelper.sqlalchemy_to_dict(book)
+                book_dict['current_member_name'] = member_name or ''
+                result.append(book_dict)
+            
+            # Determine next cursor and has_more
+            has_more = len(books) > limit
+            next_cursor = str(books[limit - 1][0].id) if result and has_more else None
+            
+            return result, next_cursor, has_more
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
     def search_books(query):
         db = SessionLocal()
         try:
@@ -219,6 +285,44 @@ class DatabaseHelper:
         try:
             members = db.query(Member).all()
             return [DatabaseHelper.sqlalchemy_to_dict(member) for member in members]
+        except SQLAlchemyError as e:
+            raise e
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_members_paginated(limit=20, cursor=None, search=None):
+        db = SessionLocal()
+        try:
+            query = db.query(Member)
+            
+            # Apply search filter
+            if search:
+                query = query.filter(
+                    (Member.name.ilike(f"%{search}%")) | (Member.email.ilike(f"%{search}%"))
+                )
+            
+            # Apply cursor for pagination
+            if cursor:
+                try:
+                    cursor_id = int(cursor)
+                    query = query.filter(Member.id > cursor_id)
+                except ValueError:
+                    pass  # Invalid cursor, ignore
+            
+            # Order by ID for consistent pagination
+            query = query.order_by(Member.id)
+            
+            # Limit results
+            members = query.limit(limit + 1).all()  # +1 to check if there are more
+            
+            result = [DatabaseHelper.sqlalchemy_to_dict(member) for member in members[:limit]]
+            
+            # Determine next cursor and has_more
+            has_more = len(members) > limit
+            next_cursor = str(members[limit - 1].id) if result and has_more else None
+            
+            return result, next_cursor, has_more
         except SQLAlchemyError as e:
             raise e
         finally:

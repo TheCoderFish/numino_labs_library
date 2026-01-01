@@ -45,19 +45,44 @@ function promisifyGrpcCall(clientMethod, request) {
 
 // Routes
 router.get('/', async (req, res) => {
-    logger.info('GET /api/books - ListBooks operation started');
+    const { limit, cursor, filter, search } = req.query;
+    logger.info(`GET /api/books - ListBooks operation started with limit: ${limit}, cursor: ${cursor}, filter: ${filter}, search: ${search}`);
     try {
-        const response = await promisifyGrpcCall(client.ListBooks, {});
-        logger.info(`GET /api/books - ListBooks operation successful, returned ${response.books.length} books`);
-        res.json(response.books);
+        const request = {
+            limit: limit ? parseInt(limit) : 20,
+            cursor: cursor || '',
+            filter: filter || 'all',
+            search: search || ''
+        };
+        const response = await promisifyGrpcCall(client.ListBooks, request);
+        logger.info(`GET /api/books - ListBooks operation successful, returned ${response.books.length} books, has_more: ${response.has_more}`);
+        res.json({
+            books: response.books,
+            next_cursor: response.next_cursor,
+            has_more: response.has_more
+        });
     } catch (error) {
         logger.error(`${config.ERROR_KEYWORD} GET /api/books - ListBooks operation failed: ${error.message}`);
         handleGrpcError(error, res);
     }
 });
 
-router.get('/search', async (req, res) => {
-    const { q } = req.query;
+router.get('/recent', async (req, res) => {
+    const { limit } = req.query;
+    logger.info(`GET /api/books/recent - ListRecentBooks operation started with limit: ${limit}`);
+    try {
+        const request = {
+            limit: limit ? parseInt(limit) : 20
+        };
+        const response = await promisifyGrpcCall(client.ListRecentBooks, request);
+        logger.info(`GET /api/books/recent - ListRecentBooks operation successful, returned ${response.books.length} books`);
+        res.json(response.books);
+    } catch (error) {
+        logger.error(`${config.ERROR_KEYWORD} GET /api/books/recent - ListRecentBooks operation failed: ${error.message}`);
+        handleGrpcError(error, res);
+    }
+});
+router.get('/search', async (req, res) => {    const { q } = req.query;
     logger.info(`GET /api/books/search - SearchBooks operation started with query: ${q}`);
     try {
         if (!q) {

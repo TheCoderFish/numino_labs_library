@@ -8,17 +8,17 @@ function Dashboard() {
   const [returning, setReturning] = useState(null);
 
   useEffect(() => {
-    loadBooks();
+    loadRecentBooks();
   }, []);
 
-  const loadBooks = async () => {
+  const loadRecentBooks = async () => {
     try {
       setLoading(true);
-      const response = await bookService.listBooks();
+      const response = await bookService.listRecentBooks(20);
       setBooks(response.data);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load books');
+      setError(err.response?.data?.error || 'Failed to load recent books');
     } finally {
       setLoading(false);
     }
@@ -36,7 +36,7 @@ function Dashboard() {
     try {
       setReturning(book.id);
       await borrowService.returnBook(book.id, book.current_member_id);
-      await loadBooks();
+      await loadRecentBooks();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to return book');
     } finally {
@@ -47,8 +47,8 @@ function Dashboard() {
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2>Dashboard</h2>
-        <button className="btn btn-primary" onClick={loadBooks}>
+        <h2>Recent Updates</h2>
+        <button className="btn btn-primary" onClick={loadRecentBooks}>
           Refresh
         </button>
       </div>

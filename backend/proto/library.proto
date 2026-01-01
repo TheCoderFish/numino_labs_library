@@ -11,6 +11,7 @@ service LibraryService {
     rpc CreateBook(CreateBookRequest) returns (CreateBookResponse);
     rpc UpdateBook(UpdateBookRequest) returns (UpdateBookResponse);
     rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
+    rpc ListRecentBooks(ListRecentBooksRequest) returns (ListRecentBooksResponse);
     rpc SearchBooks(SearchBooksRequest) returns (SearchBooksResponse);
     
     rpc CreateMember(CreateMemberRequest) returns (CreateMemberResponse);

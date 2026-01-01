@@ -70,22 +70,47 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             return book_pb2.UpdateBookResponse()
 
     def ListBooks(self, request, context):
-        """List all books with member name"""
-        logger.info("ListBooks operation started")
+        """List books with pagination and filters"""
+        logger.info(f"ListBooks operation started with limit: {request.limit}, cursor: {request.cursor}, filter: {request.filter}, search: {request.search}")
         try:
-            results = DatabaseHelper.list_books()
-            books = []
-            for row in results:
+            limit = request.limit if request.limit > 0 else 20
+            books, next_cursor, has_more = DatabaseHelper.list_books_paginated(
+                limit=limit,
+                cursor=request.cursor,
+                filter_type=request.filter,
+                search=request.search
+            )
+            books_proto = []
+            for row in books:
                 book = book_pb2.Book()
                 ParseDict(row, book, ignore_unknown_fields=True)
-                books.append(book)
-            logger.info(f"ListBooks operation successful, returned {len(books)} books")
-            return book_pb2.ListBooksResponse(books=books)
+                books_proto.append(book)
+            logger.info(f"ListBooks operation successful, returned {len(books_proto)} books, has_more: {has_more}")
+            return book_pb2.ListBooksResponse(books=books_proto, next_cursor=next_cursor or '', has_more=has_more)
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} ListBooks operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return book_pb2.ListBooksResponse()
+
+    def ListRecentBooks(self, request, context):
+        """List recent books by updated_at"""
+        logger.info(f"ListRecentBooks operation started with limit: {request.limit}")
+        try:
+            limit = request.limit if request.limit > 0 else 20
+            results = DatabaseHelper.list_recent_books(limit=limit)
+            books = []
+            for row in results:
+                book = book_pb2.Book()
+                ParseDict(row, book, ignore_unknown_fields=True)
+                books.append(book)
+            logger.info(f"ListRecentBooks operation successful, returned {len(books)} books")
+            return book_pb2.ListRecentBooksResponse(books=books)
+        except Exception as e:
+            logger.error(f"{Config.ERROR_KEYWORD} ListRecentBooks operation failed: {str(e)}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return book_pb2.ListRecentBooksResponse()
 
     def SearchBooks(self, request, context):
         """Search books by title or author"""
@@ -132,17 +157,22 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
             return member_pb2.CreateMemberResponse()
 
     def ListMembers(self, request, context):
-        """List all members"""
-        logger.info("ListMembers operation started")
+        """List members with pagination and search"""
+        logger.info(f"ListMembers operation started with limit: {request.limit}, cursor: {request.cursor}, search: {request.search}")
         try:
-            results = DatabaseHelper.list_members()
-            members = []
-            for row in results:
+            limit = request.limit if request.limit > 0 else 20
+            members, next_cursor, has_more = DatabaseHelper.list_members_paginated(
+                limit=limit,
+                cursor=request.cursor,
+                search=request.search
+            )
+            members_proto = []
+            for row in members:
                 member = member_pb2.Member()
                 ParseDict(row, member, ignore_unknown_fields=True)
-                members.append(member)
-            logger.info(f"ListMembers operation successful, returned {len(members)} members")
-            return member_pb2.ListMembersResponse(members=members)
+                members_proto.append(member)
+            logger.info(f"ListMembers operation successful, returned {len(members_proto)} members, has_more: {has_more}")
+            return member_pb2.ListMembersResponse(members=members_proto, next_cursor=next_cursor or '', has_more=has_more)
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} ListMembers operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)

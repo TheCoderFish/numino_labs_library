@@ -10,14 +10,15 @@ const api = axios.create({
 });
 
 export const bookService = {
-  listBooks: () => api.get('/books'),
+  listBooks: (params = {}) => api.get('/books', { params }),
+  listRecentBooks: (limit = 20) => api.get('/books/recent', { params: { limit } }),
   createBook: (data) => api.post('/books', data),
   updateBook: (id, data) => api.put(`/books/${id}`, data),
   searchBooks: (query) => api.get('/books/search', { params: { q: query } }),
 };
 
 export const memberService = {
-  listMembers: () => api.get('/members'),
+  listMembers: (params = {}) => api.get('/members', { params }),
   createMember: (data) => api.post('/members', data),
   updateMember: (id, data) => api.put(`/members/${id}`, data),
   searchMembers: (query) => api.get('/members/search', { params: { q: query } }),

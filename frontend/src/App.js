@@ -32,7 +32,7 @@ function App() {
               <ul className="navbar-nav ms-auto">
                 <li className="nav-item">
                   <Link className="nav-link" to="/">
-                    Dashboard
+                    Recent Updates
                   </Link>
                 </li>
                 <li className="nav-item">

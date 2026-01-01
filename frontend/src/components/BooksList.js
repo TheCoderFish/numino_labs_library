@@ -7,21 +7,48 @@ function BooksList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [returning, setReturning] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    loadBooks();
-  }, []);
+    loadBooks(true);
+  }, [searchQuery, filter]);
 
-  const loadBooks = async () => {
+  const loadBooks = async (reset = false) => {
     try {
-      setLoading(true);
-      const response = await bookService.listBooks();
-      setBooks(response.data);
+      if (reset) {
+        setLoading(true);
+        setBooks([]);
+        setNextCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      const params = {
+        limit: 20,
+        search: searchQuery,
+        filter: filter
+      };
+      
+      if (!reset && nextCursor) {
+        params.cursor = nextCursor;
+      }
+      
+      const response = await bookService.listBooks(params);
+      const newBooks = reset ? response.data.books : [...books, ...response.data.books];
+      
+      setBooks(newBooks);
+      setNextCursor(response.data.next_cursor || null);
+      setHasMore(response.data.has_more);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load books');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -37,7 +64,8 @@ function BooksList() {
     try {
       setReturning(book.id);
       await borrowService.returnBook(book.id, book.current_member_id);
-      await loadBooks();
+      // Reload books to reflect changes
+      loadBooks(true);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to return book');
     } finally {
@@ -45,17 +73,49 @@ function BooksList() {
     }
   };
 
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleFilterChange = (e) => {
+    setFilter(e.target.value);
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Books</h2>
         <div>
-          <Link to="/create-book" className="btn btn-primary">
+          <Link to="/create-book" className="btn btn-primary me-2">
             Add Book
           </Link>
-          <button className="btn btn-outline-secondary ms-2" onClick={loadBooks}>
+          <button className="btn btn-outline-secondary" onClick={() => loadBooks(true)}>
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Search and Filter Controls */}
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search by title or author..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+          />
+        </div>
+        <div className="col-md-3">
+          <select
+            className="form-select"
+            value={filter}
+            onChange={handleFilterChange}
+          >
+            <option value="all">All Books</option>
+            <option value="available">Available</option>
+            <option value="borrowed">Borrowed</option>
+          </select>
         </div>
       </div>
 
@@ -125,6 +185,25 @@ function BooksList() {
               )}
             </tbody>
           </table>
+          
+          {hasMore && (
+            <div className="text-center mt-3">
+              <button
+                className="btn btn-outline-primary"
+                onClick={() => loadBooks(false)}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
