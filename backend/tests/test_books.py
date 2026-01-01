@@ -1,6 +1,5 @@
 import pytest
 from server import LibraryService
-from psycopg2.extras import RealDictCursor
 import book_pb2
 import grpc
 
@@ -16,7 +15,7 @@ class MockContext:
         self.details = details
 
 class TestBooks:
-    def test_create_book_success(self, clean_database, db_connection):
+    def test_create_book_success(self, clean_database):
         """Test creating a book successfully"""
         service = LibraryService()
         request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -30,7 +29,7 @@ class TestBooks:
         assert not response.book.is_borrowed
         assert response.book.current_member_id == 0
 
-    def test_update_book_success(self, clean_database, db_connection):
+    def test_update_book_success(self, clean_database):
         """Test updating a book successfully"""
         service = LibraryService()
 
@@ -59,7 +58,7 @@ class TestBooks:
 
         assert context.code == grpc.StatusCode.NOT_FOUND
 
-    def test_list_books(self, clean_database, db_connection):
+    def test_list_books(self, clean_database):
         """Test listing books"""
         service = LibraryService()
 
@@ -84,7 +83,7 @@ class TestBooks:
         assert "Book 1" in titles
         assert "Book 2" in titles
 
-    def test_search_books(self, clean_database, db_connection):
+    def test_search_books(self, clean_database):
         """Test searching books"""
         service = LibraryService()
 

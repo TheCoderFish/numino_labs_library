@@ -1,6 +1,5 @@
 import pytest
 from server import LibraryService
-from psycopg2.extras import RealDictCursor
 import member_pb2
 import grpc
 
@@ -16,7 +15,7 @@ class MockContext:
         self.details = details
 
 class TestMembers:
-    def test_create_member_success(self, clean_database, db_connection):
+    def test_create_member_success(self, clean_database):
         """Test creating a member successfully"""
         service = LibraryService()
         request = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
@@ -28,7 +27,7 @@ class TestMembers:
         assert response.member.name == "John Doe"
         assert response.member.email == "john@example.com"
 
-    def test_create_member_duplicate_email(self, clean_database, db_connection):
+    def test_create_member_duplicate_email(self, clean_database):
         """Test creating a member with duplicate email"""
         service = LibraryService()
 
@@ -44,7 +43,7 @@ class TestMembers:
 
         assert context2.code == grpc.StatusCode.ALREADY_EXISTS
 
-    def test_update_member_success(self, clean_database, db_connection):
+    def test_update_member_success(self, clean_database):
         """Test updating a member successfully"""
         service = LibraryService()
 
@@ -73,7 +72,7 @@ class TestMembers:
 
         assert context.code == grpc.StatusCode.NOT_FOUND
 
-    def test_update_member_duplicate_email(self, clean_database, db_connection):
+    def test_update_member_duplicate_email(self, clean_database):
         """Test updating a member to an existing email"""
         service = LibraryService()
 
@@ -93,7 +92,7 @@ class TestMembers:
 
         assert update_context.code == grpc.StatusCode.ALREADY_EXISTS
 
-    def test_list_members(self, clean_database, db_connection):
+    def test_list_members(self, clean_database):
         """Test listing members"""
         service = LibraryService()
 
@@ -118,7 +117,7 @@ class TestMembers:
         assert "John Doe" in names
         assert "Jane Smith" in names
 
-    def test_search_members(self, clean_database, db_connection):
+    def test_search_members(self, clean_database):
         """Test searching members"""
         service = LibraryService()
 

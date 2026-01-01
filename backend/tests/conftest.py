@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy.orm import sessionmaker
-from db_helper import engine, Base, SessionLocal
+from db_helper import engine, Base, SessionLocal, Ledger, Book, Member
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
@@ -23,7 +23,8 @@ def db_session():
 @pytest.fixture
 def clean_database(db_session):
     """Clean all tables before each test"""
-    db_session.query(Base.metadata.tables['ledger']).delete()
-    db_session.query(Base.metadata.tables['book']).delete()
-    db_session.query(Base.metadata.tables['member']).delete()
+    # Delete in order to respect foreign key constraints
+    db_session.query(Ledger).delete()
+    db_session.query(Book).delete()
+    db_session.query(Member).delete()
     db_session.commit()
