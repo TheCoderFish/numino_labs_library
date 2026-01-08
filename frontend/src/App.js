@@ -3,13 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ErrorBoundary from './components/ErrorBoundary';
-import Dashboard from './components/Dashboard';
-import BooksList from './components/BooksList';
-import MembersList from './components/MembersList';
-import CreateBook from './components/CreateBook';
-import CreateMember from './components/CreateMember';
-import BorrowBook from './components/BorrowBook';
-import MemberBorrowedBooks from './components/MemberBorrowedBooks';
+import routes from './routes';
 
 function App() {
   return (
@@ -61,15 +55,9 @@ function App() {
 
           <div className="container mt-4">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/books" element={<BooksList />} />
-              <Route path="/books/:id/edit" element={<CreateBook />} />
-              <Route path="/members" element={<MembersList />} />
-              <Route path="/members/:id/edit" element={<CreateMember />} />
-              <Route path="/members/:id/borrowed-books" element={<MemberBorrowedBooks />} />
-              <Route path="/create-book" element={<CreateBook />} />
-              <Route path="/create-member" element={<CreateMember />} />
-              <Route path="/borrow-book" element={<BorrowBook />} />
+              {routes.map(route => (
+                <Route key={route.path} path={route.path} element={route.element} />
+              ))}
             </Routes>
           </div>
           
