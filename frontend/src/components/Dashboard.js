@@ -18,7 +18,8 @@ function Dashboard() {
     try {
       setLoading(true);
       const response = await bookService.listRecentBooks(20);
-      setBooks(response.data);
+      // Response now has consistent structure with books array
+      setBooks(response.data.books || response.data || []);
       setError(null);
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to load recent books';

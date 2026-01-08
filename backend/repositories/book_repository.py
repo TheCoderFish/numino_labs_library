@@ -87,8 +87,17 @@ class BookRepository(BaseRepository):
             session.close()
 
     def list_books_paginated(self, limit: int = 20, cursor: Optional[str] = None,
-                           filter_type: str = 'all', search: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str], bool]:
-        """List books with pagination and filters"""
+                           filter_type: str = 'all', search: Optional[str] = None,
+                           order_by: str = 'id') -> Tuple[List[Dict[str, Any]], Optional[str], bool]:
+        """List books with pagination and filters
+        
+        Args:
+            limit: Maximum number of books to return
+            cursor: Cursor for pagination (book ID or timestamp depending on order_by)
+            filter_type: 'all', 'available', or 'borrowed'
+            search: Search query for title/author
+            order_by: 'id' for ID-based pagination, 'updated_at' for recent books
+        """
         session = self._get_session()
         try:
             query = session.query(Book, Member.name.label('current_member_name')).outerjoin(
@@ -107,19 +116,25 @@ class BookRepository(BaseRepository):
             elif filter_type == 'borrowed':
                 query = query.filter(Book.is_borrowed == True)
 
-            # Apply cursor for pagination
-            if cursor:
-                try:
-                    cursor_id = int(cursor)
-                    query = query.filter(Book.id > cursor_id)
-                except ValueError:
-                    pass  # Invalid cursor, ignore
-
-            # Order by ID for consistent pagination
-            query = query.order_by(Book.id)
+            # Apply ordering and cursor for pagination
+            if order_by == 'updated_at':
+                # For recent books, order by updated_at descending
+                query = query.order_by(desc(Book.updated_at))
+                # Cursor-based pagination with updated_at is complex, so we'll just use limit
+                # For recent books, cursor is typically not used
+            else:
+                # Default: order by ID for consistent pagination
+                query = query.order_by(Book.id)
+                # Apply cursor for pagination
+                if cursor:
+                    try:
+                        cursor_id = int(cursor)
+                        query = query.filter(Book.id > cursor_id)
+                    except ValueError:
+                        pass  # Invalid cursor, ignore
 
             # Limit results
-            books = query.limit(limit + 1).all()  # +1 to check if there are more
+            books = query.limit(limit + 1).all() if order_by == 'id' else query.limit(limit).all()
 
             result = []
             for book, member_name in books[:limit]:
@@ -128,8 +143,13 @@ class BookRepository(BaseRepository):
                 result.append(book_dict)
 
             # Determine next cursor and has_more
-            has_more = len(books) > limit
-            next_cursor = str(books[limit - 1][0].id) if result and has_more else None
+            if order_by == 'updated_at':
+                # For recent books, we don't use cursor-based pagination
+                has_more = False
+                next_cursor = None
+            else:
+                has_more = len(books) > limit
+                next_cursor = str(books[limit - 1][0].id) if result and has_more else None
 
             return result, next_cursor, has_more
         except SQLAlchemyError as e:

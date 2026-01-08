@@ -45,55 +45,36 @@ function promisifyGrpcCall(clientMethod, request) {
 
 // Routes
 router.get('/', async (req, res) => {
-    const { limit, cursor, filter, search } = req.query;
-    logger.info(`GET /api/books - ListBooks operation started with limit: ${limit}, cursor: ${cursor}, filter: ${filter}, search: ${search}`);
+    const { limit, cursor, filter, search, recent } = req.query;
+    logger.info(`GET /api/books - ListBooks operation started with limit: ${limit}, cursor: ${cursor}, filter: ${filter}, search: ${search}, recent: ${recent}`);
     try {
+        // Determine order_by based on 'recent' query parameter
+        const order_by = recent === 'true' || recent === '1' ? 'updated_at' : 'id';
+        
+        // If search is provided, use it; otherwise check for 'q' parameter (for backward compatibility)
+        const searchQuery = search || req.query.q || '';
+        
         const request = {
             limit: limit ? parseInt(limit) : 20,
             cursor: cursor || '',
             filter: filter || 'all',
-            search: search || ''
+            search: searchQuery,
+            order_by: order_by
         };
         const response = await promisifyGrpcCall(client.ListBooks, request);
         logger.info(`GET /api/books - ListBooks operation successful, returned ${response.books.length} books, has_more: ${response.has_more}`);
+        
+        // Always return consistent structure for all requests
+        // For recent books (order_by is updated_at), pagination is not used, so set has_more to false
+        const isRecentRequest = order_by === 'updated_at';
+        
         res.json({
             books: response.books,
-            next_cursor: response.next_cursor,
-            has_more: response.has_more
+            next_cursor: isRecentRequest ? '' : (response.next_cursor || ''),
+            has_more: isRecentRequest ? false : (response.has_more || false)
         });
     } catch (error) {
         logger.error(`${config.ERROR_KEYWORD} GET /api/books - ListBooks operation failed: ${error.message}`);
-        handleGrpcError(error, res);
-    }
-});
-
-router.get('/recent', async (req, res) => {
-    const { limit } = req.query;
-    logger.info(`GET /api/books/recent - ListRecentBooks operation started with limit: ${limit}`);
-    try {
-        const request = {
-            limit: limit ? parseInt(limit) : 20
-        };
-        const response = await promisifyGrpcCall(client.ListRecentBooks, request);
-        logger.info(`GET /api/books/recent - ListRecentBooks operation successful, returned ${response.books.length} books`);
-        res.json(response.books);
-    } catch (error) {
-        logger.error(`${config.ERROR_KEYWORD} GET /api/books/recent - ListRecentBooks operation failed: ${error.message}`);
-        handleGrpcError(error, res);
-    }
-});
-router.get('/search', async (req, res) => {    const { q } = req.query;
-    logger.info(`GET /api/books/search - SearchBooks operation started with query: ${q}`);
-    try {
-        if (!q) {
-            logger.info('GET /api/books/search - No query provided, returning empty array');
-            return res.json([]);
-        }
-        const response = await promisifyGrpcCall(client.SearchBooks, { query: q });
-        logger.info(`GET /api/books/search - SearchBooks operation successful, found ${response.books.length} books`);
-        res.json(response.books);
-    } catch (error) {
-        logger.error(`${config.ERROR_KEYWORD} GET /api/books/search - SearchBooks operation failed for query '${q}': ${error.message}`);
         handleGrpcError(error, res);
     }
 });

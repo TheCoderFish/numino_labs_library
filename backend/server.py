@@ -73,14 +73,16 @@ class LibraryGrpcService(library_pb2_grpc.LibraryServiceServicer):
 
     def ListBooks(self, request, context):
         """List books with pagination and filters"""
-        logger.info(f"ListBooks operation started with limit: {request.limit}, cursor: {request.cursor}, filter: {request.filter}, search: {request.search}")
+        logger.info(f"ListBooks operation started with limit: {request.limit}, cursor: {request.cursor}, filter: {request.filter}, search: {request.search}, order_by: {request.order_by}")
         try:
             limit = request.limit if request.limit > 0 else 20
+            order_by = request.order_by if request.order_by else 'id'
             books, next_cursor, has_more = self._book_service.list_books_paginated(
                 limit=limit,
                 cursor=request.cursor,
                 filter_type=request.filter,
-                search=request.search
+                search=request.search,
+                order_by=order_by
             )
             books_proto = []
             for row in books:
@@ -96,18 +98,21 @@ class LibraryGrpcService(library_pb2_grpc.LibraryServiceServicer):
             return book_pb2.ListBooksResponse()
 
     def ListRecentBooks(self, request, context):
-        """List recent books by updated_at"""
+        """List recent books by updated_at - delegates to ListBooks for consistency"""
         logger.info(f"ListRecentBooks operation started with limit: {request.limit}")
         try:
-            limit = request.limit if request.limit > 0 else 20
-            results = self._book_service.list_recent_books(limit=limit)
-            books = []
-            for row in results:
-                book = book_pb2.Book()
-                ParseDict(row, book, ignore_unknown_fields=True)
-                books.append(book)
-            logger.info(f"ListRecentBooks operation successful, returned {len(books)} books")
-            return book_pb2.ListRecentBooksResponse(books=books)
+            # Delegate to ListBooks with order_by='updated_at'
+            list_request = book_pb2.ListBooksRequest(
+                limit=request.limit if request.limit > 0 else 20,
+                cursor='',
+                filter='all',
+                search='',
+                order_by='updated_at'
+            )
+            list_response = self.ListBooks(list_request, context)
+            # Convert ListBooksResponse to ListRecentBooksResponse
+            logger.info(f"ListRecentBooks operation successful, returned {len(list_response.books)} books")
+            return book_pb2.ListRecentBooksResponse(books=list_response.books)
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} ListRecentBooks operation failed: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -115,17 +120,24 @@ class LibraryGrpcService(library_pb2_grpc.LibraryServiceServicer):
             return book_pb2.ListRecentBooksResponse()
 
     def SearchBooks(self, request, context):
-        """Search books by title or author"""
+        """Search books by title or author - delegates to ListBooks for consistency"""
         logger.info(f"SearchBooks operation started with query: {request.query}")
         try:
-            results = self._book_service.search_books(request.query)
-            books = []
-            for row in results:
-                book = book_pb2.Book()
-                ParseDict(row, book, ignore_unknown_fields=True)
-                books.append(book)
-            logger.info(f"SearchBooks operation successful, found {len(books)} books")
-            return book_pb2.SearchBooksResponse(books=books)
+            if not request.query:
+                logger.info('SearchBooks - No query provided, returning empty array')
+                return book_pb2.SearchBooksResponse(books=[])
+            # Delegate to ListBooks with search parameter
+            list_request = book_pb2.ListBooksRequest(
+                limit=50,  # Reasonable limit for search results
+                cursor='',
+                filter='all',
+                search=request.query,
+                order_by='id'
+            )
+            list_response = self.ListBooks(list_request, context)
+            # Convert ListBooksResponse to SearchBooksResponse
+            logger.info(f"SearchBooks operation successful, found {len(list_response.books)} books")
+            return book_pb2.SearchBooksResponse(books=list_response.books)
         except Exception as e:
             logger.error(f"{Config.ERROR_KEYWORD} SearchBooks operation failed for query '{request.query}': {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)

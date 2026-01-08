@@ -45,8 +45,9 @@ function BorrowBook() {
         setBooksLoading(true);
         try {
           const response = await bookService.searchBooks(bookSearch);
-          // response.data is the array directly from axios
-          const books = Array.isArray(response.data) ? response.data : [];
+          // Response now has consistent structure with books array
+          const books = Array.isArray(response.data.books) ? response.data.books : 
+                       (Array.isArray(response.data) ? response.data : []);
           // Check both is_borrowed and isBorrowed (in case of camelCase)
           const available = books.filter((book) => {
             const isBorrowed = book.is_borrowed === true || book.isBorrowed === true;

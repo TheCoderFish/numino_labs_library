@@ -33,9 +33,10 @@ class BookService(BaseService):
         return self._book_repository.list_recent_books(limit)
 
     def list_books_paginated(self, limit: int = 20, cursor: Optional[str] = None,
-                           filter_type: str = 'all', search: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str], bool]:
+                           filter_type: str = 'all', search: Optional[str] = None,
+                           order_by: str = 'id') -> Tuple[List[Dict[str, Any]], Optional[str], bool]:
         """List books with pagination and filters"""
-        return self._book_repository.list_books_paginated(limit, cursor, filter_type, search)
+        return self._book_repository.list_books_paginated(limit, cursor, filter_type, search, order_by)
 
     def search_books(self, query: str) -> List[Dict[str, Any]]:
         """Search books by title or author"""

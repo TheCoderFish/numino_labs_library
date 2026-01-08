@@ -13,10 +13,10 @@ const api = axios.create({
 
 export const bookService = {
   listBooks: (params = {}) => api.get(ENDPOINTS.BOOKS, { params }),
-  listRecentBooks: (limit = 20) => api.get(`${ENDPOINTS.BOOKS}/recent`, { params: { limit } }),
+  listRecentBooks: (limit = 20) => api.get(ENDPOINTS.BOOKS, { params: { limit, recent: true } }),
   createBook: (data) => api.post(ENDPOINTS.BOOKS, data),
   updateBook: (id, data) => api.put(`${ENDPOINTS.BOOKS}/${id}`, data),
-  searchBooks: (query) => api.get(`${ENDPOINTS.BOOKS}/search`, { params: { q: query } }),
+  searchBooks: (query) => api.get(ENDPOINTS.BOOKS, { params: { search: query } }),
 };
 
 export const memberService = {

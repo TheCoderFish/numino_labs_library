@@ -45,6 +45,7 @@ message ListBooksRequest {
     string cursor = 2; // For cursor-based pagination
     string filter = 3; // 'all', 'available', 'borrowed'
     string search = 4; // Search query for title/author
+    string order_by = 5; // 'id' for ID-based pagination, 'updated_at' for recent books
 }
 
 message ListBooksResponse {
