@@ -1,5 +1,5 @@
 import pytest
-from server import LibraryService
+from server import LibraryGrpcService
 import book_pb2
 import grpc
 
@@ -17,7 +17,7 @@ class MockContext:
 class TestBooks:
     def test_create_book_success(self, clean_database):
         """Test creating a book successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
         request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
         context = MockContext()
 
@@ -31,7 +31,7 @@ class TestBooks:
 
     def test_update_book_success(self, clean_database):
         """Test updating a book successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book first
         create_request = book_pb2.CreateBookRequest(title="Original Title", author="Original Author")
@@ -50,7 +50,7 @@ class TestBooks:
 
     def test_update_book_not_found(self, clean_database):
         """Test updating a non-existent book"""
-        service = LibraryService()
+        service = LibraryGrpcService()
         request = book_pb2.UpdateBookRequest(id=999, title="Test", author="Test")
         context = MockContext()
 
@@ -60,7 +60,7 @@ class TestBooks:
 
     def test_list_books(self, clean_database):
         """Test listing books"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create some books
         books_data = [
@@ -85,7 +85,7 @@ class TestBooks:
 
     def test_search_books(self, clean_database):
         """Test searching books"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create some books
         books_data = [

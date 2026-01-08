@@ -11,7 +11,7 @@ import book_pb2
 import ledger_pb2
 import library_pb2_grpc
 import member_pb2
-from db_helper import DatabaseHelper, Book, Member
+from services import BookService, MemberService, LibraryService
 from error_codes import ErrorCodes
 from messages import Messages
 from logger import logger
@@ -20,14 +20,18 @@ from config import Config
 load_dotenv()
 
 
-class LibraryService(library_pb2_grpc.LibraryServiceServicer):
+class LibraryGrpcService(library_pb2_grpc.LibraryServiceServicer):
+
+    def __init__(self):
+        self._book_service = BookService()
+        self._member_service = MemberService()
+        self._library_service = LibraryService()
 
     def CreateBook(self, request, context):
         """Create a new book"""
         logger.info(f"CreateBook operation started for title: {request.title}, author: {request.author}")
         try:
-            Book.validate_data(request.title, request.author)
-            result = DatabaseHelper.create_book(request.title, request.author)
+            result = self._book_service.create_book(request.title, request.author)
             book = book_pb2.Book()
             ParseDict(result, book, ignore_unknown_fields=True)
             logger.info(f"CreateBook operation successful for book ID: {book.id}")
@@ -45,10 +49,8 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
 
     def UpdateBook(self, request, context):
         """Update an existing book"""
-        logger.info(f"UpdateBook operation started for book ID: {request.id}, title: {request.title}, author: {request.author}")
         try:
-            Book.validate_data(request.title, request.author)
-            result = DatabaseHelper.update_book(request.id, request.title, request.author)
+            result = self._book_service.update_book(request.id, request.title, request.author)
             if not result:
                 logger.warning(f"UpdateBook: Book not found for ID: {request.id}")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -74,7 +76,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         logger.info(f"ListBooks operation started with limit: {request.limit}, cursor: {request.cursor}, filter: {request.filter}, search: {request.search}")
         try:
             limit = request.limit if request.limit > 0 else 20
-            books, next_cursor, has_more = DatabaseHelper.list_books_paginated(
+            books, next_cursor, has_more = self._book_service.list_books_paginated(
                 limit=limit,
                 cursor=request.cursor,
                 filter_type=request.filter,
@@ -98,7 +100,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         logger.info(f"ListRecentBooks operation started with limit: {request.limit}")
         try:
             limit = request.limit if request.limit > 0 else 20
-            results = DatabaseHelper.list_recent_books(limit=limit)
+            results = self._book_service.list_recent_books(limit=limit)
             books = []
             for row in results:
                 book = book_pb2.Book()
@@ -116,7 +118,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Search books by title or author"""
         logger.info(f"SearchBooks operation started with query: {request.query}")
         try:
-            results = DatabaseHelper.search_books(request.query)
+            results = self._book_service.search_books(request.query)
             books = []
             for row in results:
                 book = book_pb2.Book()
@@ -134,8 +136,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Create a new member"""
         logger.info(f"CreateMember operation started for name: {request.name}, email: {request.email}")
         try:
-            Member.validate_data(request.name, request.email)
-            result = DatabaseHelper.create_member(request.name, request.email)
+            result = self._member_service.create_member(request.name, request.email)
             member = member_pb2.Member()
             ParseDict(result, member, ignore_unknown_fields=True)
             logger.info(f"CreateMember operation successful for member ID: {member.id}")
@@ -161,7 +162,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         logger.info(f"ListMembers operation started with limit: {request.limit}, cursor: {request.cursor}, search: {request.search}")
         try:
             limit = request.limit if request.limit > 0 else 20
-            members, next_cursor, has_more = DatabaseHelper.list_members_paginated(
+            members, next_cursor, has_more = self._member_service.list_members_paginated(
                 limit=limit,
                 cursor=request.cursor,
                 search=request.search
@@ -183,7 +184,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Search members by name or email"""
         logger.info(f"SearchMembers operation started with query: {request.query}")
         try:
-            results = DatabaseHelper.search_members(request.query)
+            results = self._member_service.search_members(request.query)
             members = []
             for row in results:
                 member = member_pb2.Member()
@@ -201,8 +202,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Update an existing member"""
         logger.info(f"UpdateMember operation started for member ID: {request.id}, name: {request.name}, email: {request.email}")
         try:
-            Member.validate_data(request.name, request.email)
-            result = DatabaseHelper.update_member(request.id, request.name, request.email)
+            result = self._member_service.update_member(request.id, request.name, request.email)
             if not result:
                 logger.warning(f"UpdateMember: Member not found for ID: {request.id}")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -232,21 +232,8 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Borrow a book"""
         logger.info(f"BorrowBook operation started for book ID: {request.book_id}, member ID: {request.member_id}")
         try:
-            # Business logic validations
-            if not DatabaseHelper.is_book_available(request.book_id):
-                logger.warning(f"BorrowBook: Book {request.book_id} is not available")
-                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-                context.set_details(
-                    json.dumps({"code": ErrorCodes.BOOK_ALREADY_BORROWED, "message": "Book is not available"}))
-                return ledger_pb2.BorrowBookResponse()
-            if not DatabaseHelper.member_exists(request.member_id):
-                logger.warning(f"BorrowBook: Member {request.member_id} not found")
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                context.set_details(json.dumps({"code": ErrorCodes.MEMBER_NOT_FOUND, "message": "Member not found"}))
-                return ledger_pb2.BorrowBookResponse()
-
-            # Borrow the book using DatabaseHelper
-            result = DatabaseHelper.borrow_book(request.book_id, request.member_id)
+            # Borrow the book using the library service
+            result = self._library_service.borrow_book(request.book_id, request.member_id)
 
             # Convert result to protobuf format
             ledger_entry = ledger_pb2.LedgerEntry()
@@ -306,16 +293,8 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """Return a book"""
         logger.info(f"ReturnBook operation started for book ID: {request.book_id}, member ID: {request.member_id}")
         try:
-            # Business logic validations
-            if not DatabaseHelper.is_book_borrowed_by_member(request.book_id, request.member_id):
-                logger.warning(f"ReturnBook: Book {request.book_id} is not borrowed by member {request.member_id}")
-                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-                context.set_details(json.dumps(
-                    {"code": ErrorCodes.BOOK_NOT_BORROWED_BY_MEMBER, "message": "Book is not borrowed by this member"}))
-                return ledger_pb2.ReturnBookResponse()
-
-            # Return the book using DatabaseHelper
-            result = DatabaseHelper.return_book(request.book_id, request.member_id)
+            # Return the book using the library service
+            result = self._library_service.return_book(request.book_id, request.member_id)
 
             # Convert result to protobuf format
             ledger_entry = ledger_pb2.LedgerEntry()
@@ -376,7 +355,7 @@ class LibraryService(library_pb2_grpc.LibraryServiceServicer):
         """List all books borrowed by a member"""
         logger.info(f"ListBorrowedBooks operation started for member ID: {request.member_id}")
         try:
-            results = DatabaseHelper.list_borrowed_books(request.member_id)
+            results = self._book_service.list_borrowed_books(request.member_id)
             books = []
             for row in results:
                 book = book_pb2.Book()
@@ -398,7 +377,7 @@ def serve():
     Base.metadata.create_all(bind=engine)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    library_pb2_grpc.add_LibraryServiceServicer_to_server(LibraryService(), server)
+    library_pb2_grpc.add_LibraryServiceServicer_to_server(LibraryGrpcService(), server)
 
     port = Config.SERVER_PORT
     server.add_insecure_port('[::]:' + port)

@@ -1,5 +1,5 @@
 import pytest
-from server import LibraryService
+from server import LibraryGrpcService
 import member_pb2
 import grpc
 
@@ -17,7 +17,7 @@ class MockContext:
 class TestMembers:
     def test_create_member_success(self, clean_database):
         """Test creating a member successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
         request = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
         context = MockContext()
 
@@ -29,7 +29,7 @@ class TestMembers:
 
     def test_create_member_duplicate_email(self, clean_database):
         """Test creating a member with duplicate email"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create first member
         request1 = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
@@ -45,7 +45,7 @@ class TestMembers:
 
     def test_update_member_success(self, clean_database):
         """Test updating a member successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a member first
         create_request = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
@@ -64,7 +64,7 @@ class TestMembers:
 
     def test_update_member_not_found(self, clean_database):
         """Test updating a non-existent member"""
-        service = LibraryService()
+        service = LibraryGrpcService()
         request = member_pb2.UpdateMemberRequest(id=999, name="Test", email="test@example.com")
         context = MockContext()
 
@@ -74,7 +74,7 @@ class TestMembers:
 
     def test_update_member_duplicate_email(self, clean_database):
         """Test updating a member to an existing email"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create two members
         request1 = member_pb2.CreateMemberRequest(name="John Doe", email="john@example.com")
@@ -94,7 +94,7 @@ class TestMembers:
 
     def test_list_members(self, clean_database):
         """Test listing members"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create some members
         members_data = [
@@ -119,7 +119,7 @@ class TestMembers:
 
     def test_search_members(self, clean_database):
         """Test searching members"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create some members
         members_data = [

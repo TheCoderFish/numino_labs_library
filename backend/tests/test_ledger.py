@@ -1,5 +1,5 @@
 import pytest
-from server import LibraryService
+from server import LibraryGrpcService
 import book_pb2
 import member_pb2
 import ledger_pb2
@@ -20,7 +20,7 @@ class MockContext:
 class TestLedger:
     def test_borrow_book_success(self, clean_database):
         """Test borrowing a book successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -46,7 +46,7 @@ class TestLedger:
 
     def test_borrow_book_not_found(self, clean_database):
         """Test borrowing a non-existent book"""
-        service = LibraryService()
+        service = LibraryGrpcService()
         request = ledger_pb2.BorrowBookRequest(book_id=999, member_id=1)
         context = MockContext()
 
@@ -58,7 +58,7 @@ class TestLedger:
 
     def test_borrow_member_not_found(self, clean_database):
         """Test borrowing with non-existent member"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -75,7 +75,7 @@ class TestLedger:
 
     def test_borrow_already_borrowed(self, clean_database):
         """Test borrowing an already borrowed book"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -108,7 +108,7 @@ class TestLedger:
 
     def test_double_borrow_same_member(self, clean_database):
         """Test same member trying to borrow same book twice"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -136,7 +136,7 @@ class TestLedger:
 
     def test_return_book_success(self, clean_database):
         """Test returning a book successfully"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -167,7 +167,7 @@ class TestLedger:
 
     def test_return_book_not_borrowed(self, clean_database):
         """Test returning a book that is not borrowed"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -190,7 +190,7 @@ class TestLedger:
 
     def test_return_wrong_member(self, clean_database):
         """Test returning a book by wrong member"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -223,7 +223,7 @@ class TestLedger:
 
     def test_double_return(self, clean_database):
         """Test returning the same book twice"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -256,7 +256,7 @@ class TestLedger:
 
     def test_list_borrowed_books(self, clean_database):
         """Test listing borrowed books for a member"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create two books
         book1_request = book_pb2.CreateBookRequest(title="Book 1", author="Author 1")
@@ -296,7 +296,7 @@ class TestLedger:
 
     def test_concurrent_borrow_same_book_different_members(self, clean_database):
         """Test concurrent borrows of the same book by different members - only one should succeed"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
@@ -354,7 +354,7 @@ class TestLedger:
 
     def test_concurrent_return_same_book(self, clean_database):
         """Test concurrent returns of the same book - only one should succeed"""
-        service = LibraryService()
+        service = LibraryGrpcService()
 
         # Create a book
         book_request = book_pb2.CreateBookRequest(title="Test Book", author="Test Author")
