@@ -12,7 +12,8 @@ function DataTable({
   filterOptions = [],
   initialFilter = 'all',
   addButton = null,
-  refreshButton = true
+  refreshButton = true,
+  refreshTrigger = 0
 }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +78,7 @@ function DataTable({
 
   useEffect(() => {
     loadTableData(true);
-  }, [searchQuery, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchQuery, filter, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);

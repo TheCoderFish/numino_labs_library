@@ -31,7 +31,7 @@ function Dashboard() {
   };
 
   const handleReturnClick = (book) => {
-    if (!book.is_borrowed || !book.current_member_id) {
+    if (!book.is_borrowed || !book.current_member) {
       return;
     }
     setBookToReturn(book);
@@ -42,7 +42,7 @@ function Dashboard() {
 
     try {
       setReturning(bookToReturn.id);
-      await borrowService.returnBook(bookToReturn.id, bookToReturn.current_member_id);
+      await borrowService.returnBook(bookToReturn.id, bookToReturn.current_member);
       toast.success(`"${bookToReturn.title}" returned successfully!`);
       setBookToReturn(null);
       await loadRecentBooks();

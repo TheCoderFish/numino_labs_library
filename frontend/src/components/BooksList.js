@@ -8,18 +8,19 @@ import DataTable from './DataTable';
 function BooksList() {
   const [returning, setReturning] = useState(null);
   const [bookToReturn, setBookToReturn] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const loadBooks = async (params) => {
     const response = await bookService.listBooks(params);
     return {
-      data: response.data.books,
-      next_cursor: response.data.next_cursor,
-      has_more: response.data.has_more
+      data: Array.isArray(response.data) ? response.data : response.data.books || [],
+      next_cursor: response.data.next_cursor || null,
+      has_more: response.data.has_more || false
     };
   };
 
   const handleReturnClick = (book) => {
-    if (!book.is_borrowed || !book.current_member_id) {
+    if (!book.is_borrowed || !book.current_member) {
       return;
     }
     setBookToReturn(book);
@@ -30,10 +31,10 @@ function BooksList() {
 
     try {
       setReturning(bookToReturn.id);
-      await borrowService.returnBook(bookToReturn.id, bookToReturn.current_member_id);
+      await borrowService.returnBook(bookToReturn.id, bookToReturn.current_member);
       toast.success(`"${bookToReturn.title}" returned successfully!`);
       setBookToReturn(null);
-      // Reload will be handled by DataTable refresh
+      setRefreshTrigger(prev => prev + 1);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to return book');
     } finally {
@@ -110,6 +111,7 @@ function BooksList() {
         filterOptions={filterOptions}
         initialFilter="all"
         addButton={{ text: 'Add Book', to: '/create-book' }}
+        refreshTrigger={refreshTrigger}
       />
 
       <ConfirmationModal

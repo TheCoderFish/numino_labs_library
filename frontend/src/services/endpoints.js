@@ -1,4 +1,4 @@
 export const ENDPOINTS = {
-  BOOKS: '/books',
-  MEMBERS: '/members',
+  BOOKS: '/books/',
+  MEMBERS: '/members/',
 };

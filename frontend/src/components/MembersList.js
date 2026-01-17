@@ -7,9 +7,9 @@ function MembersList() {
   const loadMembers = async (params) => {
     const response = await memberService.listMembers(params);
     return {
-      data: response.data.members,
-      next_cursor: response.data.next_cursor,
-      has_more: response.data.has_more
+      data: Array.isArray(response.data) ? response.data : response.data.members || [],
+      next_cursor: response.data.next_cursor || null,
+      has_more: response.data.has_more || false
     };
   };
 
