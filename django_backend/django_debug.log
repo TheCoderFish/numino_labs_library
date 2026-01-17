@@ -507,3 +507,36 @@ WARNING 2026-01-17 19:00:18,306 log "POST /api/books/101/borrow/ HTTP/1.1" 404 3
 INFO 2026-01-17 19:00:43,610 log "GET /api/members/ HTTP/1.1" 200 421
 INFO 2026-01-17 19:01:28,202 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
 INFO 2026-01-17 19:01:28,227 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
+INFO 2026-01-17 19:09:15,791 autoreload /Users/nuralikhoja/Desktop/assignments/numino/django_backend/library/models.py changed, reloading.
+INFO 2026-01-17 19:09:16,483 autoreload Watching for file changes with StatReloader
+INFO 2026-01-17 19:10:54,749 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
+INFO 2026-01-17 19:10:54,763 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
+INFO 2026-01-17 19:10:57,741 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
+INFO 2026-01-17 19:11:04,605 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 503
+INFO 2026-01-17 19:11:04,629 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 503
+INFO 2026-01-17 19:11:08,067 log "OPTIONS /api/books/ HTTP/1.1" 200 0
+INFO 2026-01-17 19:11:08,131 log "POST /api/books/ HTTP/1.1" 201 165
+INFO 2026-01-17 19:11:09,175 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 669
+INFO 2026-01-17 19:11:09,199 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 669
+INFO 2026-01-17 19:11:14,443 log "GET /api/books/?search=q HTTP/1.1" 200 167
+INFO 2026-01-17 19:11:17,052 log "GET /api/members/?search=a HTTP/1.1" 200 421
+INFO 2026-01-17 19:11:17,831 log "GET /api/members/?search=Alice+def+(alice%40example.com) HTTP/1.1" 200 2
+INFO 2026-01-17 19:11:18,047 log "OPTIONS /api/books/4/borrow/ HTTP/1.1" 200 0
+INFO 2026-01-17 19:11:18,099 log "POST /api/books/4/borrow/ HTTP/1.1" 200 118
+INFO 2026-01-17 19:11:21,119 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 699
+INFO 2026-01-17 19:11:21,163 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 699
+WARNING 2026-01-17 19:11:31,166 log Not Found: /api/books/4/borrow/
+WARNING 2026-01-17 19:11:31,167 log "POST /api/books/4/borrow/ HTTP/1.1" 404 40
+WARNING 2026-01-17 19:11:38,174 log Bad Request: /api/books/4/borrow/
+WARNING 2026-01-17 19:11:38,174 log "POST /api/books/4/borrow/ HTTP/1.1" 400 37
+INFO 2026-01-17 19:11:43,930 log "OPTIONS /api/books/4/return/ HTTP/1.1" 200 0
+INFO 2026-01-17 19:11:43,994 log "POST /api/books/4/return/ HTTP/1.1" 200 118
+INFO 2026-01-17 19:11:44,025 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 669
+INFO 2026-01-17 19:11:45,858 log "POST /api/books/4/borrow/ HTTP/1.1" 200 118
+WARNING 2026-01-17 19:12:07,696 log Not Found: /api/books/9/return/
+WARNING 2026-01-17 19:12:07,697 log "POST /api/books/9/return/ HTTP/1.1" 404 37
+WARNING 2026-01-17 19:12:12,634 log Bad Request: /api/books/4/return/
+WARNING 2026-01-17 19:12:12,635 log "POST /api/books/4/return/ HTTP/1.1" 400 48
+WARNING 2026-01-17 19:12:17,905 log Not Found: /api/books/4/return/
+WARNING 2026-01-17 19:12:17,906 log "POST /api/books/4/return/ HTTP/1.1" 404 39
+INFO 2026-01-17 19:12:27,367 log "POST /api/books/4/return/ HTTP/1.1" 200 118

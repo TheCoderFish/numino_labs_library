@@ -3,10 +3,10 @@ from django.utils import timezone
 
 
 class Member(models.Model):
-    name = models.TextField()
-    email = models.TextField(unique=True)
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
     created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'member'
@@ -16,8 +16,8 @@ class Member(models.Model):
 
 
 class Book(models.Model):
-    title = models.TextField()
-    author = models.TextField()
+    title = models.CharField(max_length=255)
+    author = models.CharField(max_length=255)
     is_borrowed = models.BooleanField(default=False)
     current_member = models.ForeignKey(
         Member,
@@ -28,7 +28,7 @@ class Book(models.Model):
         db_column='current_member_id'
     )
     created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'book'
