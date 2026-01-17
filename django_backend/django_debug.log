@@ -471,3 +471,39 @@ INFO 2026-01-17 18:50:28,385 log "POST /api/books/1/return/ HTTP/1.1" 200 118
 INFO 2026-01-17 18:50:28,426 log "GET /api/books/?limit=20&search=&filter=all HTTP/1.1" 200 346
 INFO 2026-01-17 18:50:30,961 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 346
 INFO 2026-01-17 18:50:30,984 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 346
+INFO 2026-01-17 18:52:36,035 autoreload /Users/nuralikhoja/Desktop/assignments/numino/django_backend/library/serializers.py changed, reloading.
+INFO 2026-01-17 18:52:36,685 autoreload Watching for file changes with StatReloader
+INFO 2026-01-17 18:57:28,791 autoreload /Users/nuralikhoja/Desktop/assignments/numino/django_backend/library/models.py changed, reloading.
+INFO 2026-01-17 18:57:29,488 autoreload Watching for file changes with StatReloader
+INFO 2026-01-17 18:58:18,911 log "GET /api/members/search?q=N HTTP/1.1" 301 0
+WARNING 2026-01-17 18:58:18,917 log Not Found: /api/members/search/
+WARNING 2026-01-17 18:58:18,917 log "GET /api/members/search/?q=N HTTP/1.1" 404 23
+ERROR 2026-01-17 18:58:28,013 log Internal Server Error: /api/books
+Traceback (most recent call last):
+  File "/Users/nuralikhoja/Desktop/assignments/numino/django_backend/venv/lib/python3.12/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nuralikhoja/Desktop/assignments/numino/django_backend/venv/lib/python3.12/site-packages/django/utils/deprecation.py", line 311, in __call__
+    response = self.process_response(request, response)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nuralikhoja/Desktop/assignments/numino/django_backend/venv/lib/python3.12/site-packages/django/middleware/common.py", line 109, in process_response
+    self.get_full_path_with_slash(request)
+  File "/Users/nuralikhoja/Desktop/assignments/numino/django_backend/venv/lib/python3.12/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to localhost:8000/api/books/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+ERROR 2026-01-17 18:58:28,014 log "POST /api/books HTTP/1.1" 500 30843
+INFO 2026-01-17 18:58:31,984 log "POST /api/books/ HTTP/1.1" 201 166
+WARNING 2026-01-17 18:58:41,479 log Not Found: /api/books/133/
+WARNING 2026-01-17 18:58:41,480 log "PATCH /api/books/133/ HTTP/1.1" 404 45
+INFO 2026-01-17 18:58:45,951 log "PATCH /api/books/1/ HTTP/1.1" 200 168
+INFO 2026-01-17 18:59:05,083 log "GET /api/members/ HTTP/1.1" 200 292
+WARNING 2026-01-17 18:59:29,255 log Bad Request: /api/members/
+WARNING 2026-01-17 18:59:29,256 log "POST /api/members/ HTTP/1.1" 400 36
+INFO 2026-01-17 18:59:38,703 log "POST /api/members/ HTTP/1.1" 201 128
+INFO 2026-01-17 18:59:54,760 log "GET /api/books HTTP/1.1" 301 0
+INFO 2026-01-17 18:59:54,784 log "GET /api/books/ HTTP/1.1" 200 503
+WARNING 2026-01-17 19:00:18,305 log Not Found: /api/books/101/borrow/
+WARNING 2026-01-17 19:00:18,306 log "POST /api/books/101/borrow/ HTTP/1.1" 404 39
+INFO 2026-01-17 19:00:43,610 log "GET /api/members/ HTTP/1.1" 200 421
+INFO 2026-01-17 19:01:28,202 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503
+INFO 2026-01-17 19:01:28,227 log "GET /api/books/?limit=20&recent=true HTTP/1.1" 200 503

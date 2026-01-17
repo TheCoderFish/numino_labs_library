@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Book, Member, Ledger
 
+
 class MemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
@@ -17,13 +18,16 @@ class MemberSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Email already exists.")
         return value
 
+
 class BookSerializer(serializers.ModelSerializer):
     current_member_name = serializers.CharField(source='current_member.name', read_only=True)
 
     class Meta:
         model = Book
-        fields = ['id', 'title', 'author', 'is_borrowed', 'current_member', 'current_member_name', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'author', 'is_borrowed', 'current_member', 'current_member_name', 'created_at',
+                  'updated_at']
         read_only_fields = ['id', 'is_borrowed', 'current_member', 'current_member_name', 'created_at', 'updated_at']
+
 
 class LedgerSerializer(serializers.ModelSerializer):
     class Meta:

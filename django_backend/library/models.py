@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
+
 class Member(models.Model):
     name = models.TextField()
     email = models.TextField(unique=True)
@@ -13,14 +14,15 @@ class Member(models.Model):
     def __str__(self):
         return self.name
 
+
 class Book(models.Model):
     title = models.TextField()
     author = models.TextField()
     is_borrowed = models.BooleanField(default=False)
     current_member = models.ForeignKey(
-        Member, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='borrowed_books',
         db_column='current_member_id'
@@ -38,19 +40,20 @@ class Book(models.Model):
     def __str__(self):
         return self.title
 
+
 class Ledger(models.Model):
     class ActionType(models.TextChoices):
         BORROW = 'BORROW', 'Borrow'
         RETURN = 'RETURN', 'Return'
 
     book = models.ForeignKey(
-        Book, 
-        on_delete=models.CASCADE, 
+        Book,
+        on_delete=models.CASCADE,
         related_name='ledger_entries'
     )
     member = models.ForeignKey(
-        Member, 
-        on_delete=models.CASCADE, 
+        Member,
+        on_delete=models.CASCADE,
         related_name='ledger_entries'
     )
     action_type = models.TextField(choices=ActionType.choices)
