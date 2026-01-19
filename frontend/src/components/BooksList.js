@@ -11,12 +11,8 @@ function BooksList() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const loadBooks = async (params) => {
-    const response = await bookService.listBooks(params);
-    return {
-      data: Array.isArray(response.data) ? response.data : response.data.books || [],
-      next_cursor: response.data.next_cursor || null,
-      has_more: response.data.has_more || false
-    };
+    // API service already returns {data, next_cursor, has_more}
+    return await bookService.listBooks(params);
   };
 
   const handleReturnClick = (book) => {

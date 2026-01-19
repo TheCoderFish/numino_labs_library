@@ -49,8 +49,9 @@ def create_members(conn, n):
 
     with conn.cursor() as cur:
         execute_values(cur,
-            "INSERT INTO member (name, email) VALUES %s RETURNING id, name, email",
-            members
+            "INSERT INTO member (name, email, created_at, updated_at) VALUES %s RETURNING id, name, email",
+            members,
+            template="(%s, %s, NOW(), NOW())"
         )
         rows = cur.fetchall()
     conn.commit()
@@ -65,8 +66,9 @@ def create_books(conn, n):
 
     with conn.cursor() as cur:
         execute_values(cur,
-            "INSERT INTO book (title, author, is_borrowed) VALUES %s RETURNING id, title, author",
-            books
+            "INSERT INTO book (title, author, is_borrowed, created_at, updated_at) VALUES %s RETURNING id, title, author",
+            [(title, author, is_borrowed) for title, author, is_borrowed in books],
+            template="(%s, %s, %s, NOW(), NOW())"
         )
         rows = cur.fetchall()
     conn.commit()
@@ -94,8 +96,9 @@ def assign_borrows(conn, book_rows, member_rows, ratio=0.15):
 
         # Insert ledger entries
         execute_values(cur,
-            "INSERT INTO ledger (book_id, member_id, action_type) VALUES %s",
-            ledger_entries
+            "INSERT INTO ledger (book_id, member_id, action_type, log_date) VALUES %s",
+            ledger_entries,
+            template="(%s, %s, %s, NOW())"
         )
     conn.commit()
 

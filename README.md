@@ -109,3 +109,46 @@ The API is served at `http://localhost:8000/api/`.
 - `POST /api/members/` - Create a new member
 - `GET /api/members/{id}/` - Retrieve a member
 - `GET /api/members/{id}/borrowed-books/` - List books borrowed by member
+
+## Pagination
+
+The API uses **cursor-based pagination** for efficient data retrieval. All list endpoints (Books, Members) support pagination.
+
+### How It Works
+
+Cursor pagination provides stable pagination even when data is being added or removed. It uses an opaque cursor string to track position.
+
+**Response Format:**
+```json
+{
+  "next": "http://localhost:8000/api/books/?cursor=bz01&page_size=20",
+  "previous": "http://localhost:8000/api/books/?cursor=cj0x...",
+  "results": [...]
+}
+```
+
+### Parameters
+
+- `page_size` - Number of items per page (default: 20, max: 100)
+- `cursor` - Opaque cursor string for navigation (provided in `next`/`previous`)
+
+### Examples
+
+```bash
+# Get first page of books (20 items)
+curl http://localhost:8000/api/books/
+
+# Get first 10 books
+curl http://localhost:8000/api/books/?page_size=10
+
+# Navigate to next page using cursor from response
+curl "http://localhost:8000/api/books/?cursor=bz01&page_size=10"
+
+# Get members with pagination
+curl http://localhost:8000/api/members/?page_size=15
+```
+
+### Ordering
+
+- **Books**: Ordered by `updated_at` (descending) - most recently updated first
+- **Members**: Ordered by `id` (ascending)

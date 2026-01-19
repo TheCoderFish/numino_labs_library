@@ -43,7 +43,7 @@ function DataTable({
       }
 
       const params = {
-        limit: 20,
+        page_size: 20,
         search: searchQuery
       };
 

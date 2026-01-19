@@ -4,19 +4,37 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from .models import Book, Member
 from .serializers import BookSerializer, MemberSerializer, LedgerSerializer
+from .pagination import BookCursorPagination, MemberCursorPagination
 from . import services, selectors
 
 
 class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.none()  # Placeholder, overridden by get_queryset
     serializer_class = BookSerializer
+    pagination_class = BookCursorPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'author']
-    ordering_fields = ['id', 'updated_at']
-    ordering = ['id']
+    ordering_fields = ['id', 'title', 'updated_at']
+    ordering = ['title']  # Match pagination ordering
 
     def get_queryset(self):
-        return selectors.get_book_list()
+        queryset = selectors.get_book_list()
+        
+        # Handle filter parameter for availability
+        filter_param = self.request.query_params.get('filter', None)
+        if filter_param == 'available':
+            queryset = queryset.filter(is_borrowed=False)
+        elif filter_param == 'borrowed':
+            queryset = queryset.filter(is_borrowed=True)
+        
+        # Handle is_borrowed parameter (for BorrowBook component)
+        is_borrowed_param = self.request.query_params.get('is_borrowed', None)
+        if is_borrowed_param is not None:
+            # Convert string to boolean
+            is_borrowed = is_borrowed_param.lower() in ('true', '1', 'yes')
+            queryset = queryset.filter(is_borrowed=is_borrowed)
+        
+        return queryset
 
     @action(detail=True, methods=['post'])
     def borrow(self, request, pk=None):
@@ -55,6 +73,7 @@ class BookViewSet(viewsets.ModelViewSet):
 class MemberViewSet(viewsets.ModelViewSet):
     queryset = Member.objects.none()
     serializer_class = MemberSerializer
+    pagination_class = MemberCursorPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'email']
 

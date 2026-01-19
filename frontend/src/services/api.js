@@ -11,19 +11,71 @@ const api = axios.create({
   },
 });
 
+/**
+ * Extract cursor parameter from a paginated URL
+ * @param {string} url - Full URL with cursor parameter
+ * @returns {string|null} - Cursor value or null
+ */
+const extractCursor = (url) => {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get('cursor');
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Transform DRF paginated response to frontend format
+ * @param {object} response - Axios response with DRF pagination
+ * @returns {object} - Transformed response {data, next_cursor, has_more}
+ */
+const transformPaginatedResponse = (response) => {
+  // Check if response has pagination structure
+  if (response.data && typeof response.data === 'object' && 'results' in response.data) {
+    return {
+      data: response.data.results || [],
+      next_cursor: extractCursor(response.data.next),
+      has_more: !!response.data.next
+    };
+  }
+  // Fallback for non-paginated responses
+  return {
+    data: Array.isArray(response.data) ? response.data : [],
+    next_cursor: null,
+    has_more: false
+  };
+};
+
 export const bookService = {
-  listBooks: (params = {}) => api.get(ENDPOINTS.BOOKS, { params }),
-  listRecentBooks: (limit = 20) => api.get(ENDPOINTS.BOOKS, { params: { limit, recent: true } }),
+  listBooks: async (params = {}) => {
+    const response = await api.get(ENDPOINTS.BOOKS, { params });
+    return transformPaginatedResponse(response);
+  },
+  listRecentBooks: async (limit = 20) => {
+    const response = await api.get(ENDPOINTS.BOOKS, { params: { page_size: limit } });
+    return transformPaginatedResponse(response);
+  },
   createBook: (data) => api.post(ENDPOINTS.BOOKS, data),
   updateBook: (id, data) => api.put(`${ENDPOINTS.BOOKS}${id}/`, data),
-  searchBooks: (query) => api.get(ENDPOINTS.BOOKS, { params: { search: query } }),
+  searchBooks: async (query, additionalParams = {}) => {
+    const response = await api.get(ENDPOINTS.BOOKS, { params: { search: query, ...additionalParams } });
+    return transformPaginatedResponse(response);
+  },
 };
 
 export const memberService = {
-  listMembers: (params = {}) => api.get(ENDPOINTS.MEMBERS, { params }),
+  listMembers: async (params = {}) => {
+    const response = await api.get(ENDPOINTS.MEMBERS, { params });
+    return transformPaginatedResponse(response);
+  },
   createMember: (data) => api.post(ENDPOINTS.MEMBERS, data),
   updateMember: (id, data) => api.put(`${ENDPOINTS.MEMBERS}${id}/`, data),
-  searchMembers: (query) => api.get(ENDPOINTS.MEMBERS, { params: { search: query } }),
+  searchMembers: async (query) => {
+    const response = await api.get(ENDPOINTS.MEMBERS, { params: { search: query } });
+    return transformPaginatedResponse(response);
+  },
 };
 
 export const borrowService = {
@@ -33,4 +85,3 @@ export const borrowService = {
 };
 
 export default api;
-

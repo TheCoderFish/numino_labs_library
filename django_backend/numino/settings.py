@@ -168,6 +168,12 @@ LOGGING = {
     },
 }
 
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    'PAGE_SIZE': 20,
+}
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

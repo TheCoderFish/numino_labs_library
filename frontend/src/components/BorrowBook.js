@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 import { bookService, memberService, borrowService } from '../services/api';
 
 function BorrowBook() {
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [members, setMembers] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
@@ -40,20 +42,15 @@ function BorrowBook() {
         setFilteredBooks([]);
         return;
       }
-      
+
       if (bookSearch && bookSearch.length > 0) {
         setBooksLoading(true);
         try {
-          const response = await bookService.searchBooks(bookSearch);
-          // Response now has consistent structure with books array
-          const books = Array.isArray(response.data.books) ? response.data.books : 
-                       (Array.isArray(response.data) ? response.data : []);
-          // Check both is_borrowed and isBorrowed (in case of camelCase)
-          const available = books.filter((book) => {
-            const isBorrowed = book.is_borrowed === true || book.isBorrowed === true;
-            return !isBorrowed;
-          });
-          const filtered = available.slice(0, 10);
+          // Add is_borrowed=false filter to only get available books
+          const response = await bookService.searchBooks(bookSearch, { is_borrowed: 'false' });
+          // Response is already transformed by API service: {data, next_cursor, has_more}
+          const books = response.data || [];
+          const filtered = books.slice(0, 10);
           setFilteredBooks(filtered);
           // Ensure dropdown shows if we have results
           if (filtered.length > 0) {
@@ -84,8 +81,8 @@ function BorrowBook() {
         setMembersLoading(true);
         try {
           const response = await memberService.searchMembers(memberSearch);
-          // response.data is the array directly from axios
-          const members = Array.isArray(response.data) ? response.data : [];
+          // Response is already transformed: {data, next_cursor, has_more}
+          const members = response.data || [];
           setFilteredMembers(members.slice(0, 10));
         } catch (err) {
           console.error('Member search error:', err);
@@ -141,13 +138,11 @@ function BorrowBook() {
     try {
       await borrowService.borrowBook(formData.book_id, formData.member_id);
       toast.success('Book borrowed successfully!');
-      setFormData({ book_id: '', book_title: '', member_id: '', member_name: '' });
-      setBookSearch('');
-      setMemberSearch('');
+      // Navigate to member's borrowed books page
+      navigate(`/members/${formData.member_id}/borrowed-books`);
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'Failed to borrow book';
       toast.error(errorMsg);
-    } finally {
       setLoading(false);
     }
   };
