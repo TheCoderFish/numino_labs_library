@@ -76,6 +76,10 @@ export const memberService = {
     const response = await api.get(ENDPOINTS.MEMBERS, { params: { search: query } });
     return transformPaginatedResponse(response);
   },
+  checkEmail: async (email) => {
+    const response = await api.get(`${ENDPOINTS.MEMBERS}check-email/`, { params: { email } });
+    return response.data;
+  },
 };
 
 export const borrowService = {

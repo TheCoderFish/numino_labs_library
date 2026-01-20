@@ -3,9 +3,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from .models import Book, Member
-from .serializers import BookSerializer, MemberSerializer, LedgerSerializer
+from .serializers import (
+    BookSerializer, MemberSerializer, LedgerSerializer,
+    BorrowBookSerializer, ReturnBookSerializer
+)
 from .pagination import BookCursorPagination, MemberCursorPagination
-from . import services, selectors
+from . import selectors
 
 
 class BookViewSet(viewsets.ModelViewSet):
@@ -36,38 +39,28 @@ class BookViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+    def get_serializer_class(self):
+        if self.action == 'borrow':
+            return BorrowBookSerializer
+        if self.action == 'return_book':
+            return ReturnBookSerializer
+        return super().get_serializer_class()
+
     @action(detail=True, methods=['post'])
     def borrow(self, request, pk=None):
-        member_id = request.data.get('member_id')
-        if not member_id:
-            return Response({"error": "member_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            ledger = services.borrow_book(book_id=pk, member_id=member_id)
-            return Response(LedgerSerializer(ledger).data, status=status.HTTP_200_OK)
-        except ValueError as e:
-            # Business logic errors (not found, already borrowed)
-            if "not found" in str(e).lower():
-                return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        book = self.get_object()
+        serializer = self.get_serializer(data=request.data, context={'book': book})
+        serializer.is_valid(raise_exception=True)
+        ledger = serializer.save()
+        return Response(LedgerSerializer(ledger).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='return')
     def return_book(self, request, pk=None):
-        member_id = request.data.get('member_id')
-        if not member_id:
-            return Response({"error": "member_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            ledger = services.return_book(book_id=pk, member_id=member_id)
-            return Response(LedgerSerializer(ledger).data, status=status.HTTP_200_OK)
-        except ValueError as e:
-            if "not found" in str(e).lower():
-                return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        book = self.get_object()
+        serializer = self.get_serializer(data=request.data, context={'book': book})
+        serializer.is_valid(raise_exception=True)
+        ledger = serializer.save()
+        return Response(LedgerSerializer(ledger).data, status=status.HTTP_200_OK)
 
 
 class MemberViewSet(viewsets.ModelViewSet):
@@ -86,3 +79,14 @@ class MemberViewSet(viewsets.ModelViewSet):
         books = Book.objects.filter(current_member_id=pk)
         serializer = BookSerializer(books, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='check-email')
+    def check_email(self, request):
+        email = request.query_params.get('email', '').strip()
+        if not email:
+            return Response({'available': False, 'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if email is valid format first (optional, but good)
+        # We can just check existence
+        exists = Member.objects.filter(email=email).exists()
+        return Response({'available': not exists})

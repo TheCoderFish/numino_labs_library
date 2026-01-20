@@ -13,18 +13,22 @@ function CreateMember() {
     name: '',
     email: '',
   });
+  const [originalEmail, setOriginalEmail] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingMember, setLoadingMember] = useState(isEditMode);
+  const [emailStatus, setEmailStatus] = useState({ checking: false, available: null });
 
   useEffect(() => {
     if (isEditMode) {
       // Try to get member data from navigation state first
       if (location.state?.member) {
+        const email = location.state.member.email || '';
         setFormData({
           name: location.state.member.name || '',
-          email: location.state.member.email || '',
+          email: email,
         });
+        setOriginalEmail(email);
         setLoadingMember(false);
       } else {
         loadMember();
@@ -35,17 +39,17 @@ function CreateMember() {
   const loadMember = async () => {
     try {
       setLoadingMember(true);
-      // Fetch all members and find the one with matching ID
-      // Since there's no GET by ID endpoint, we'll fetch a reasonable number
+      // Fetch all members to find the one with matching ID
       const response = await memberService.listMembers({ limit: 1000 });
       const members = response.data.members || [];
       const member = members.find(m => m.id === parseInt(id));
-      
+
       if (member) {
         setFormData({
           name: member.name || '',
           email: member.email || '',
         });
+        setOriginalEmail(member.email || '');
       } else {
         toast.error('Member not found');
         navigate('/members');
@@ -59,10 +63,40 @@ function CreateMember() {
     }
   };
 
+  // Debounced email check
+  useEffect(() => {
+    const email = trimWhitespace(formData.email);
+
+    // Reset status if empty or same as original
+    if (!email || (isEditMode && email === originalEmail)) {
+      setEmailStatus({ checking: false, available: null });
+      setFormErrors(prev => ({ ...prev, email: null }));
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setEmailStatus({ checking: true, available: null });
+      try {
+        const result = await memberService.checkEmail(email);
+        setEmailStatus({ checking: false, available: result.available });
+        if (!result.available) {
+          setFormErrors(prev => ({ ...prev, email: 'Email is already taken' }));
+        } else {
+          setFormErrors(prev => ({ ...prev, email: null }));
+        }
+      } catch (err) {
+        console.error('Email check failed', err);
+        setEmailStatus({ checking: false, available: null });
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.email, isEditMode, originalEmail]);
+
   const handleChange = (e) => {
     const value = e.target.value;
     const name = e.target.name;
-    
+
     // Clear error for this field when user starts typing
     if (formErrors[name]) {
       setFormErrors({
@@ -70,7 +104,7 @@ function CreateMember() {
         [name]: null
       });
     }
-    
+
     setFormData({
       ...formData,
       [name]: value,
@@ -79,7 +113,7 @@ function CreateMember() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Trim whitespace from all fields
     const trimmedData = {
       name: trimWhitespace(formData.name),
@@ -94,8 +128,16 @@ function CreateMember() {
       return;
     }
 
+    // Check unique email status again before submitting
+    if (trimmedData.email !== originalEmail && emailStatus.available === false) {
+      setFormErrors(prev => ({ ...prev, email: 'Email is already taken' }));
+      toast.error('Email is already taken');
+      return;
+    }
+
     setLoading(true);
-    setFormErrors({});
+    // Be careful not to clear errors if we want to keep them, but here we assume validation passed
+    // setFormErrors({}); 
 
     try {
       if (isEditMode) {
@@ -105,8 +147,9 @@ function CreateMember() {
         await memberService.createMember(trimmedData);
         toast.success('Member created successfully!');
         setFormData({ name: '', email: '' });
+        setOriginalEmail('');
       }
-      
+
       setTimeout(() => {
         navigate('/members');
       }, 1000);
@@ -160,22 +203,31 @@ function CreateMember() {
             <label htmlFor="email" className="form-label">
               Email <span className="text-danger">*</span>
             </label>
-            <input
-              type="email"
-              className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-            {formErrors.email && (
-              <div className="invalid-feedback">{formErrors.email}</div>
-            )}
+            <div className="position-relative">
+              <input
+                type="email"
+                className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+              {emailStatus.checking && (
+                <div className="position-absolute end-0 top-50 translate-middle-y me-2">
+                  <div className="spinner-border spinner-border-sm text-secondary" role="status">
+                    <span className="visually-hidden">Checking...</span>
+                  </div>
+                </div>
+              )}
+              {formErrors.email && (
+                <div className="invalid-feedback">{formErrors.email}</div>
+              )}
+            </div>
           </div>
 
           <div className="d-flex gap-2">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button type="submit" className="btn btn-primary" disabled={loading || (emailStatus.checking)}>
               {loading ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -185,9 +237,9 @@ function CreateMember() {
                 isEditMode ? 'Update Member' : 'Create Member'
               )}
             </button>
-            <button 
-              type="button" 
-              className="btn btn-outline-secondary" 
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
               onClick={() => navigate('/members')}
               disabled={loading}
             >
@@ -201,4 +253,3 @@ function CreateMember() {
 }
 
 export default CreateMember;
-

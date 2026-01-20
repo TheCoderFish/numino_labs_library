@@ -24,13 +24,13 @@ export const isNotEmpty = (value) => {
  */
 export const isValidEmail = (email) => {
   if (!email || typeof email !== 'string') return false;
-  
+
   const trimmed = trimWhitespace(email);
   if (trimmed.length === 0) return false;
-  
+
   // RFC 5322 compliant regex (simplified but comprehensive)
   const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-  
+
   return emailRegex.test(trimmed);
 };
 
@@ -42,8 +42,8 @@ export const validateBookTitle = (title) => {
   if (!isNotEmpty(trimmed)) {
     return { valid: false, error: 'Title is required' };
   }
-  if (trimmed.length > 500) {
-    return { valid: false, error: 'Title must be less than 500 characters' };
+  if (trimmed.length > 255) {
+    return { valid: false, error: 'Title must be less than 255 characters' };
   }
   return { valid: true };
 };
@@ -56,8 +56,8 @@ export const validateBookAuthor = (author) => {
   if (!isNotEmpty(trimmed)) {
     return { valid: false, error: 'Author is required' };
   }
-  if (trimmed.length > 200) {
-    return { valid: false, error: 'Author name must be less than 200 characters' };
+  if (trimmed.length > 255) {
+    return { valid: false, error: 'Author name must be less than 255 characters' };
   }
   return { valid: true };
 };
@@ -70,8 +70,8 @@ export const validateMemberName = (name) => {
   if (!isNotEmpty(trimmed)) {
     return { valid: false, error: 'Name is required' };
   }
-  if (trimmed.length > 200) {
-    return { valid: false, error: 'Name must be less than 200 characters' };
+  if (trimmed.length > 255) {
+    return { valid: false, error: 'Name must be less than 255 characters' };
   }
   return { valid: true };
 };
@@ -84,6 +84,9 @@ export const validateMemberEmail = (email) => {
   if (!isNotEmpty(trimmed)) {
     return { valid: false, error: 'Email is required' };
   }
+  if (trimmed.length > 254) {
+    return { valid: false, error: 'Email must be less than 254 characters' };
+  }
   if (!isValidEmail(trimmed)) {
     return { valid: false, error: 'Please enter a valid email address' };
   }
@@ -95,17 +98,17 @@ export const validateMemberEmail = (email) => {
  */
 export const validateBookForm = (formData) => {
   const errors = {};
-  
+
   const titleValidation = validateBookTitle(formData.title);
   if (!titleValidation.valid) {
     errors.title = titleValidation.error;
   }
-  
+
   const authorValidation = validateBookAuthor(formData.author);
   if (!authorValidation.valid) {
     errors.author = authorValidation.error;
   }
-  
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors
@@ -117,17 +120,17 @@ export const validateBookForm = (formData) => {
  */
 export const validateMemberForm = (formData) => {
   const errors = {};
-  
+
   const nameValidation = validateMemberName(formData.name);
   if (!nameValidation.valid) {
     errors.name = nameValidation.error;
   }
-  
+
   const emailValidation = validateMemberEmail(formData.email);
   if (!emailValidation.valid) {
     errors.email = emailValidation.error;
   }
-  
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors
